@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+  <title>Online Graphics Generator</title>
+
+  <style>
+    body { 
+		margin: 0; 
+		padding: 0; 
+		font-family: Arial, sans-serif;
+		overflow: hidden;
+	}
+
+
+	#top-bar { 
+		position: fixed; 
+		top: 0;
+		left: 0;
+		width: 100%;
+		background: rgba(200, 200, 200, 0.8);
+		display: flex; 
+		flex-wrap: wrap; 
+		padding: 10px; 
+		z-index: 1000;
+	}
+
+	#top-bar div {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		gap: 10px;
+		width: 90%;
+	}
+
+	/* Modal styles */
+	#about-modal {
+		display: none;
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		width: 90%;
+		max-width: 500px;
+		background: #ffffff;
+		border-radius: 8px;
+		box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+		padding: 20px;
+		z-index: 2000;
+	}
+
+	#about-modal.active {
+		display: block;
+	}
+
+	#about-modal h1 {
+		font-size: 24px;
+		margin-bottom: 10px;
+		color: #333;
+	}
+
+	#about-modal p {
+		font-size: 16px;
+		margin-bottom: 20px;
+		color: #555;
+	}
+
+	#about-modal .modal-footer {
+		text-align: right;
+	}
+
+	#about-modal .modal-footer button {
+		background-color: #ff4d4d;
+		color: #ffffff;
+		border: none;
+		border-radius: 5px;
+		padding: 10px 15px;
+		font-size: 14px;
+		cursor: pointer;
+	}
+
+	#about-modal .modal-footer button:hover {
+		background-color: #e60000;
+	}
+	
+	
+	
+    #top-bar.hidden {
+		display: none; 
+	}
+    #top-bar button {
+		margin-right: 10px;
+		padding: 10px 20px;
+		cursor: pointer;
+	}
+    #pendulum-controls {
+		display: flex; 
+		flex-direction: column; 
+		margin-top: 10px; 
+		flex-wrap: wrap;
+	}
+    .pendulum-row {
+		margin-bottom: 5px;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		flex-wrap: wrap
+	}
+    #canvas-container { 
+		position: fixed; 
+		top: 0; 
+		left: 0; 
+		width: 100%; 
+		height: 100%;
+	}
+    canvas { 
+		display: block;
+	}
+    #show-interface-btn { 
+		position: fixed; 
+		top: 10px; 
+		left: 10px; 
+		background: rgba(200, 200, 200, 0.8); 
+		padding: 10px 20px; 
+		cursor: pointer; 
+		display: none; 
+		z-index: 1001; 
+	}
+  </style>
+</head>
+<body>
+  <div id="top-bar">
+	<div>
+		<button id="add-pendulum-btn">Add Pendulum</button>
+		<button id="toggle-drawing-btn">Enable Drawing</button>
+		<button id="toggle-visibility-btn">Hide Interface</button>
+		<button id="clear-board-btn">Clear Board</button>
+		<button id="remove-pendulum-btn">Remove Last Pendulum</button>
+		<button id="start-stop-btn">Start Rotation</button>
+		<button id="save-link-button">Share Graph</button>
+		<button id="save-image-button">Save Image</button>
+		<button id="about-btn">About</button>
+	</div>
+	
+    <div id="pendulum-controls"></div>
+	
+	<div id="about-modal">
+    <h1>Online Graphics Generator</h1>
+    <p>The tool allows the user to configure the parameters and create beautiful graphics (using pendulums) that can be shared or saved as images and used in other projects.</p>
+    <p>© 2024 <a style="text-decoration: none" href="https://maxim-ionescu-portfolio-page.netlify.app">Maxim Ionescu</a></p>
+    <div class="modal-footer">
+        <button onclick="closeAboutModal()">Close</button>
+    </div>
+</div>
+  </div>
+
+  <button id="show-interface-btn">Show Interface</button>
+
+  <div id="canvas-container">
+    <canvas id="pendulum-canvas"></canvas>
+  </div>
+
+  <script>
+    class Pendulum {
+      constructor(length, speed, angle, parent = null) {
+        this.length = length;
+        this.speed = speed;
+        this.angle = angle;
+        this.angleVel = speed;
+        this.parent = parent;
+        this.trace = [];
+        this.drawing = false;
+        this.origin = parent ? parent.getEndPosition() : [canvas.width / 2, canvas.height / 2];
+        this.endPos = this.getEndPosition();
+      }
+
+      update() {
+        if (appState.rotationEnabled) {
+          this.angle += this.angleVel;
+        }
+        this.origin = this.parent ? this.parent.getEndPosition() : [canvas.width / 2, canvas.height / 2];
+        this.endPos = this.getEndPosition();
+        if (this.drawing) this.trace.push([...this.endPos]);
+      }
+
+      getEndPosition() {
+        const x = this.origin[0] + this.length * Math.sin(this.angle);
+        const y = this.origin[1] + this.length * Math.cos(this.angle);
+        return [x, y];
+      }
+
+      draw(showPendulums) {
+        if (this.trace.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(this.trace[0][0], this.trace[0][1]);
+          this.trace.forEach(([x, y]) => ctx.lineTo(x, y));
+          ctx.strokeStyle = '#000';
+          ctx.stroke();
+        }
+
+        if (showPendulums) {
+          ctx.beginPath();
+          ctx.moveTo(this.origin[0], this.origin[1]);
+          ctx.lineTo(this.endPos[0], this.endPos[1]);
+          ctx.strokeStyle = '#000';
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(this.endPos[0], this.endPos[1], 8, 0, Math.PI * 2);
+          ctx.fillStyle = this.parent ? '#0000FF' : '#FF0000';
+          ctx.fill();
+        }
+      }
+    }
+
+
+    const appState = {
+      pendulums: [],
+      drawingEnabled: false,
+      interfaceVisible: true,
+      rotationEnabled: false
+    };
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    function addPendulum() {
+      const parent = appState.pendulums[appState.pendulums.length - 1] || null;
+      const pendulum = new Pendulum(100, 0.01, 0, parent);
+      appState.pendulums.push(pendulum);
+      createPendulumUI(pendulum);
+    }
+
+	function createPendulumUI(pendulum) {
+	  const row = document.createElement('div');
+	  row.className = 'pendulum-row';
+
+	  const lengthInput = document.createElement('input');
+	  lengthInput.type = 'number';
+	  lengthInput.value = pendulum.length;
+	  lengthInput.addEventListener('input', () => pendulum.length = parseFloat(lengthInput.value) || 100);
+
+	  const angleInput = document.createElement('input');
+	  angleInput.type = 'number';
+	  angleInput.value = 0.1;
+	  angleInput.addEventListener('input', () => pendulum.angleVel = parseFloat(angleInput.value) || 0.01);
+
+	  const toggleDrawingCheckbox = document.createElement('input');
+	  toggleDrawingCheckbox.type = 'checkbox';
+	  toggleDrawingCheckbox.checked = pendulum.drawing;
+	  toggleDrawingCheckbox.addEventListener('change', () => pendulum.drawing = toggleDrawingCheckbox.checked);
+
+	  const toggleDrawingLabel = document.createElement('label');
+	  toggleDrawingLabel.textContent = 'Enable Drawing';
+	  toggleDrawingLabel.appendChild(toggleDrawingCheckbox);
+
+	  row.appendChild(lengthInput);
+	  row.appendChild(angleInput);
+	  row.appendChild(toggleDrawingLabel);
+	  pendulumControlsDiv.appendChild(row);
+	}
+
+    function toggleDrawing() {
+      appState.drawingEnabled = !appState.drawingEnabled;
+      appState.pendulums.forEach(p => p.drawing = appState.drawingEnabled);
+    }
+
+    function toggleVisibility() {
+      appState.interfaceVisible = !appState.interfaceVisible;
+      document.getElementById('top-bar').classList.toggle('hidden', !appState.interfaceVisible);
+      showInterfaceBtn.style.display = appState.interfaceVisible ? 'none' : 'block';
+    }
+
+    function clearBoard() {
+      appState.pendulums.forEach(p => p.trace = []);
+    }
+
+    function removeLastPendulum() {
+      if (appState.pendulums.length > 0) {
+        appState.pendulums.pop();
+        pendulumControlsDiv.lastChild.remove();
+      }
+    }
+
+    function startStopRotation() {
+      appState.rotationEnabled = !appState.rotationEnabled;
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      appState.pendulums.forEach(p => p.update());
+      appState.pendulums.forEach(p => p.draw(appState.interfaceVisible));
+      requestAnimationFrame(animate);
+    }
+
+    const canvas = document.getElementById('pendulum-canvas');
+    const ctx = canvas.getContext('2d');
+	ctx.scale(0.05, 0.05);
+    const pendulumControlsDiv = document.getElementById('pendulum-controls');
+    const showInterfaceBtn = document.getElementById('show-interface-btn');
+
+    document.getElementById('add-pendulum-btn').addEventListener('click', addPendulum);
+    document.getElementById('toggle-drawing-btn').addEventListener('click', toggleDrawing);
+    document.getElementById('toggle-visibility-btn').addEventListener('click', toggleVisibility);
+    document.getElementById('clear-board-btn').addEventListener('click', clearBoard);
+    document.getElementById('remove-pendulum-btn').addEventListener('click', removeLastPendulum);
+    document.getElementById('start-stop-btn').addEventListener('click', startStopRotation);
+	document.getElementById('save-link-button').addEventListener('click', () => {
+	  const properties = appState.pendulums.map(pendulum => ({
+		length: pendulum.length,
+		speed: pendulum.speed,
+		angle: pendulum.angle,
+		angleVel: pendulum.angleVel,
+		drawing: pendulum.drawing,
+		parentIndex: appState.pendulums.indexOf(pendulum.parent) // Save the index of the parent pendulum
+	  }));
+	  const encodedData = encodeURIComponent(JSON.stringify(properties));
+	  const shareableLink = `${window.location.href.split('?')[0]}?data=${encodedData}`;
+	  navigator.clipboard.writeText(shareableLink).then(() => alert('Link copied to clipboard!'));
+	});
+	
+
+    showInterfaceBtn.addEventListener('click', () => toggleVisibility());
+	
+	// Function to load pendulum properties from URL parameters
+	function loadPendulumPropertiesFromURL() {
+	  const urlParams = new URLSearchParams(window.location.search);
+	  const data = urlParams.get('data');
+	  if (data) {
+		try {
+		  const properties = JSON.parse(decodeURIComponent(data));
+
+		  properties.forEach(pendulumProps => {
+			const parentPendulum = pendulumProps.parentIndex !== -1 ? appState.pendulums[pendulumProps.parentIndex] : null;
+
+			const pendulum = new Pendulum(
+			  pendulumProps.length,
+			  pendulumProps.speed,
+			  pendulumProps.angle,
+			  parentPendulum
+			);
+			pendulum.angleVel = pendulumProps.angleVel;
+			pendulum.drawing = pendulumProps.drawing;
+			appState.pendulums.push(pendulum);
+			createPendulumUI(pendulum);
+		  });
+		} catch (error) {
+		  console.error('Failed to load pendulum properties from URL:', error);
+		}
+	  }
+	}
+
+	// Call this function when the page loads to load pendulum properties from the URL
+	window.addEventListener('load', loadPendulumPropertiesFromURL);
+
+	document.getElementById('save-image-button').addEventListener('click', () => {
+	  const canvas = document.getElementById('pendulum-canvas');
+	  const ctx = canvas.getContext('2d');
+	  
+	  // Save current state of pendulums
+	  const pendulumsState = appState.pendulums.map(pendulum => ({...pendulum}));
+	  
+	  // Hide pendulums
+	  appState.pendulums.forEach(pendulum => pendulum.drawing = false);
+	  
+	  // Redraw canvas without pendulums
+	  ctx.clearRect(0, 0, canvas.width, canvas.height);
+	  appState.pendulums.forEach(p => p.draw(false));
+	  
+	  // Save the image
+	  const image = canvas.toDataURL('image/png');
+	  const link = document.createElement('a');
+	  link.href = image;
+	  link.download = 'pendulum_canvas.png';
+	  link.click();
+	  
+	  // Restore pendulums' drawing state
+	  appState.pendulums.forEach((pendulum, index) => Object.assign(pendulum, pendulumsState[index]));
+	});
+
+	const aboutBtn = document.getElementById('about-btn');
+	const aboutModal = document.getElementById('about-modal');
+
+	aboutModal.style.display = 'none';
+
+	aboutBtn.addEventListener('click', () => {
+		if (aboutModal.style.display === 'none') {
+			aboutModal.style.display = 'block'; // Show modal
+		} else {
+			aboutModal.style.display = 'none'; // Hide modal
+		}
+	});
+
+	function closeAboutModal() {
+		aboutModal.style.display = 'none';
+	}
+
+
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    animate();
+	
+	
+  </script>
+</body>
+</html>
