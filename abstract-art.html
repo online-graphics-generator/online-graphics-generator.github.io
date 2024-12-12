@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Generator</title>
+    <style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		body {
+			font-family: 'Arial', sans-serif;
+			background-color: #1e1e2f;
+			color: #fff;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			height: 100vh;
+		}
+
+		.app-container {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 20px; /* Add spacing between elements */
+			text-align: center;
+		}
+
+		canvas {
+			border: 4px solid #6c5ce7;
+			border-radius: 12px;
+			margin-bottom: 10px; /* Optional additional margin */
+		}
+
+		.generate-button {
+			background-color: #6c5ce7;
+			color: #fff;
+			padding: 15px 30px;
+			font-size: 1rem;
+			border: none;
+			border-radius: 8px;
+			cursor: pointer;
+			transition: background-color 0.3s;
+		}
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <h1>🎨 Abstract Art Generator</h1>
+		
+        <canvas id="artCanvas" width="600" height="600"></canvas>
+        <button class="generate-button" id="generate-art-btn">Generate New Art</button>
+		<p>© <a style="text-decoration: none" href="https://www.instagram.com/creatioexnihil00/">creatioexnihil00</a></p>
+    </div>
+
+    <script>
+        // Get the canvas and context
+        const canvas = document.getElementById('artCanvas');
+        const ctx = canvas.getContext('2d');
+        const generateButton = document.getElementById('generate-art-btn');
+
+        // Random color generator
+        function randomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        // Random number generator in a range
+        function random(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        // Generate random shapes
+        function drawRandomShapes() {
+            // Clear the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Set a background gradient
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, randomColor());
+            gradient.addColorStop(1, randomColor());
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw random circles
+            for (let i = 0; i < 20; i++) {
+                ctx.beginPath();
+                ctx.arc(random(50, 550), random(50, 550), random(10, 80), 0, Math.PI * 2);
+                ctx.fillStyle = randomColor();
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            // Draw random lines
+            for (let i = 0; i < 15; i++) {
+                ctx.beginPath();
+                ctx.moveTo(random(0, 600), random(0, 600));
+                ctx.lineTo(random(0, 600), random(0, 600));
+                ctx.strokeStyle = randomColor();
+                ctx.lineWidth = random(1, 10);
+                ctx.stroke();
+                ctx.closePath();
+            }
+
+            // Draw random rectangles
+            for (let i = 0; i < 10; i++) {
+                ctx.beginPath();
+                ctx.rect(random(0, 600), random(0, 600), random(30, 100), random(30, 100));
+                ctx.fillStyle = randomColor();
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            // Draw random triangles
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.moveTo(random(0, 600), random(0, 600));
+                ctx.lineTo(random(0, 600), random(0, 600));
+                ctx.lineTo(random(0, 600), random(0, 600));
+                ctx.closePath();
+                ctx.fillStyle = randomColor();
+                ctx.fill();
+            }
+
+            // Add some random splashes of circles
+            for (let i = 0; i < 50; i++) {
+                const x = random(0, canvas.width);
+                const y = random(0, canvas.height);
+                const size = random(2, 10);
+                ctx.fillStyle = randomColor();
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Event listener for the button to generate new art
+        generateButton.addEventListener('click', drawRandomShapes);
+
+        // Generate the first piece of art when the page loads
+        drawRandomShapes();
+    </script>
+
+</body>
+</html>
