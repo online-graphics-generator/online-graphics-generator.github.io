@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Image Generator</title>
+	<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+    <title>🎨 Abstract Art Generator</title>
     <style>
 		* {
 			margin: 0;
@@ -18,24 +21,30 @@
 			display: flex;
 			justify-content: center;
 			align-items: center;
-			height: 100vh;
+			min-height: 100vh;
+			padding: 20px;
 		}
 
 		.app-container {
 			display: flex;
 			flex-direction: column;
 			align-items: center;
-			gap: 20px; /* Add spacing between elements */
+			gap: 20px;
 			text-align: center;
+			width: 100%;
+			max-width: 600px;
 		}
 
 		canvas {
 			border: 4px solid #6c5ce7;
 			border-radius: 12px;
-			margin-bottom: 10px; /* Optional additional margin */
+			width: 100%; 
+			max-width: 600px; 
+			height: auto; 
+			aspect-ratio: 1 / 1;
 		}
 
-		.generate-button {
+		.generate-button, .save-button {
 			background-color: #6c5ce7;
 			color: #fff;
 			padding: 15px 30px;
@@ -44,8 +53,24 @@
 			border-radius: 8px;
 			cursor: pointer;
 			transition: background-color 0.3s;
+			width: 100%;
+			max-width: 200px;
+			text-align: center;
 		}
-    </style>
+
+		.generate-button:hover, .save-button:hover {
+			background-color: #4b39c4;
+		}
+
+		a {
+			color: #6c5ce7;
+			text-decoration: none;
+		}
+
+		a:hover {
+			text-decoration: underline;
+		}
+	</style>
 </head>
 <body>
 
@@ -54,7 +79,8 @@
 		
         <canvas id="artCanvas" width="600" height="600"></canvas>
         <button class="generate-button" id="generate-art-btn">Generate New Art</button>
-		<p>© <a style="text-decoration: none" href="https://www.instagram.com/creatioexnihil00/">creatioexnihil00</a></p>
+        <button class="save-button" id="save-art-btn">Save Image</button>
+		<p>© <a href="https://www.instagram.com/creatioexnihil00/">creatioexnihil00</a></p>
     </div>
 
     <script>
@@ -62,6 +88,7 @@
         const canvas = document.getElementById('artCanvas');
         const ctx = canvas.getContext('2d');
         const generateButton = document.getElementById('generate-art-btn');
+        const saveButton = document.getElementById('save-art-btn');
 
         // Random color generator
         function randomColor() {
@@ -144,6 +171,14 @@
 
         // Event listener for the button to generate new art
         generateButton.addEventListener('click', drawRandomShapes);
+
+        // Save canvas image as PNG
+        saveButton.addEventListener('click', function() {
+            const link = document.createElement('a');
+            link.download = 'abstract-art.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        });
 
         // Generate the first piece of art when the page loads
         drawRandomShapes();
