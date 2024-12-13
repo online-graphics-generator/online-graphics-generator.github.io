@@ -130,6 +130,24 @@
 		display: none; 
 		z-index: 1001; 
 	}
+	.buy-coffee-button {
+		background-color: #ff813f;
+		color: #fff;
+		padding: 15px 30px;
+		font-size: 1rem;
+		border: none;
+		border-radius: 8px;
+		cursor: pointer;
+		transition: background-color 0.3s;
+		width: 100%;
+		max-width: 200px;
+		text-align: center;
+	}
+
+	.buy-coffee-button:hover {
+		background-color: #e76b2f;
+	}
+
   </style>
 </head>
 <body>
@@ -151,7 +169,14 @@
 	<div id="about-modal">
     <h1>Online Graphics Generator</h1>
     <p>The tool allows the user to configure the parameters and create beautiful graphics (using pendulums) that can be shared or saved as images and used in other projects.</p>
+	<p>Try also the <a style="text-decoration: none"  href="./abstract-art.html">Abstract Art Generator</a>
     <p>© 2024 <a style="text-decoration: none" href="https://www.instagram.com/creatioexnihil00/">creatioexnihil00</a></p>
+	<p>Love what you see? ☕ Fuel my creativity by buying me a coffee! Every sip counts!</p>
+	<a href="https://www.buymeacoffee.com/creatioexnihilo" target="_blank">
+		<button class="buy-coffee-button">☕ Buy Me a Coffee</button>
+	</a>
+	<br />
+	<br />
     <div class="modal-footer">
         <button onclick="closeAboutModal()">Close</button>
     </div>
