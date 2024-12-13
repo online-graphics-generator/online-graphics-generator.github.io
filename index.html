@@ -242,12 +242,12 @@
 	  row.className = 'pendulum-row';
 
 	  const lengthInput = document.createElement('input');
-	  lengthInput.type = 'number';
+	  lengthInput.type = 'text';
 	  lengthInput.value = pendulum.length;
 	  lengthInput.addEventListener('input', () => pendulum.length = parseFloat(lengthInput.value) || 100);
 
 	  const angleInput = document.createElement('input');
-	  angleInput.type = 'number';
+	  angleInput.type = 'text';
 	  angleInput.value = 0.1;
 	  angleInput.addEventListener('input', () => pendulum.angleVel = parseFloat(angleInput.value) || 0.01);
 
