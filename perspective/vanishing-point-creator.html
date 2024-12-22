@@ -336,15 +336,17 @@
 
         // Touch Events
         canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent scrolling
             const rect = canvas.getBoundingClientRect();
             const scale = parseFloat(canvas.dataset.scale);
             const x = (e.touches[0].clientX - rect.left) / scale;
             const y = (e.touches[0].clientY - rect.top) / scale;
             const diameter = 2 * Math.min(canvas.width, canvas.height) * 0.01;
-        
+
             for (const point of vanishingPoints) {
                 if (Math.hypot(point.x - x, point.y - y) < diameter) {
                     canvas.ontouchmove = (moveEvent) => {
+                        moveEvent.preventDefault(); // Prevent scrolling during move
                         const moveX = (moveEvent.touches[0].clientX - rect.left) / scale;
                         const moveY = (moveEvent.touches[0].clientY - rect.top) / scale;
                         point.x = moveX;
@@ -355,8 +357,9 @@
                 }
             }
         });
-        
-        canvas.addEventListener('touchend', () => {
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault(); // Prevent any residual scroll
             canvas.ontouchmove = null;
         });
 
