@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+    <title>Vanishing Point Grid Creator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f4f4f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        header {
+            background: #6200ea;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+            width: 112%;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        nav a {
+            color: #fff;
+            text-decoration: none;
+            margin-right: 20px;
+            cursor: pointer;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        footer {
+            color: black;
+            padding: 10px;
+            text-align: center;
+            width: 100%;
+            margin-top: auto;
+            position: relative;
+        }
+
+        form {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+            margin: 20px auto;
+        }
+
+        form input[type="number"], form button {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        form button {
+            background: #6200ea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        form button:hover {
+            background: #3700b3;
+        }
+
+        #canvasContainer {
+            position: relative;
+            display: none;
+            overflow: hidden;
+            max-width: 100%;
+            max-height: 80vh;
+            margin-top: 20px;
+        }
+
+        canvas {
+            border: 1px solid #ccc;
+            cursor: crosshair;
+        }
+
+        #saveBtn {
+            margin: 10px auto;
+            padding: 10px 20px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+        }
+
+        #saveBtn:hover {
+            background: #388e3c;
+        }
+
+        #modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            max-width: 90%;
+            width: 400px; 
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            z-index: 1000;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        #modalOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        #modal button {
+            background: #6200ea;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 16px;
+        }
+
+        #modal button:hover {
+            background: #3700b3;
+        }
+
+        /* Small screens adjustments */
+        @media screen and (max-width: 480px) {
+            #modal {
+                padding: 15px;
+                width: 80%;
+            }
+
+            #modal button {
+                font-size: 14px;
+                padding: 8px 12px;
+            }
+        }
+
+        @media screen and (max-width: 320px) {
+            #modal {
+                font-size: 14px;
+            }
+
+            #modal button {
+                font-size: 12px;
+                padding: 6px 10px;
+            }
+        }
+
+        #modal button.buy-coffee-button {
+            background-color: #ff813f;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 16px;
+        }
+
+        #modal button.buy-coffee-button:hover {
+            background-color: #e76b2f;
+        }
+
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Vanishing Point Grid Creator</h1>
+        <nav>
+            <a id="aboutLink">About</a>
+        </nav>
+    </header>
+
+
+
+    <form id="form">
+        <label for="canvasWidth">Canvas Width:</label>
+        <input type="number" id="canvasWidth" min="100" value="800" required>
+
+        <label for="canvasHeight">Canvas Height:</label>
+        <input type="number" id="canvasHeight" min="100" value="600" required>
+
+        <label for="numPoints">Number of Vanishing Points:</label>
+        <input type="number" id="numPoints" min="1" value="2" required>
+
+        <label for="numRays">Number of Rays per Point:</label>
+        <input type="number" id="numRays" min="2" value="12" required>
+
+        <button type="submit">Create Canvas</button>
+    </form>
+
+    <div id="canvasContainer">
+        <canvas id="gridCanvas"></canvas>
+    </div>
+
+    <button id="saveBtn">Save Grid</button>
+
+    <div id="modalOverlay"></div>
+    <div id="modal">
+        <h3>About Vanishing Point Grid Creator</h3>
+        <p>This tool helps artists create perspective grids with customizable canvas sizes, vanishing points, and rays. Easily drag and position vanishing points to generate the perfect grid for your art projects.</p>
+        <h3>Instructions</h3>
+        <p>Modify the values as you need and click on "Create Canvas", adjust the vanishing points and when you are ready click "Save Grid". This will save the grid with transparent background you can use in digital art for perspective.</p>
+
+        <p>Love what you see? ☕ Fuel my creativity by buying me a coffee! Every sip counts!</p>
+        <a style="text-decoration: none;" href="https://www.buymeacoffee.com/creatioexnihilo" target="_blank">
+            <button class="buy-coffee-button">☕ Buy Me a Coffee</button>
+        </a>
+        <button id="closeModal">Close</button>
+    </div>
+
+    <footer>
+        <p>© 2024 <a style="text-decoration: none" href="https://www.instagram.com/creatioexnihil00/">creatioexnihil00</a></p>
+    </footer>
+
+    <script>
+        const form = document.getElementById('form');
+        const canvasContainer = document.getElementById('canvasContainer');
+        const canvas = document.getElementById('gridCanvas');
+        const ctx = canvas.getContext('2d');
+        const saveBtn = document.getElementById('saveBtn');
+        const modal = document.getElementById('modal');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const aboutLink = document.getElementById('aboutLink');
+        const closeModal = document.getElementById('closeModal');
+
+        let vanishingPoints = [];
+
+        aboutLink.addEventListener('click', () => {
+            modal.style.display = 'block';
+            modalOverlay.style.display = 'block';
+        });
+
+        closeModal.addEventListener('click', () => {
+            modal.style.display = 'none';
+            modalOverlay.style.display = 'none';
+        });
+
+        modalOverlay.addEventListener('click', () => {
+            modal.style.display = 'none';
+            modalOverlay.style.display = 'none';
+        });
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const width = parseInt(document.getElementById('canvasWidth').value);
+            const height = parseInt(document.getElementById('canvasHeight').value);
+            const numPoints = parseInt(document.getElementById('numPoints').value);
+            const numRays = parseInt(document.getElementById('numRays').value);
+
+            canvas.width = width;
+            canvas.height = height;
+
+            canvasContainer.style.display = 'block';
+            saveBtn.style.display = 'block';
+
+            const scaleX = canvasContainer.clientWidth / width;
+            const scaleY = canvasContainer.clientHeight / height;
+            const scale = Math.min(scaleX, scaleY, 1);
+
+            // Calculate centering offsets
+            const offsetX = (canvasContainer.clientWidth - width * scale) / 2;
+            const offsetY = (canvasContainer.clientHeight - height * scale) / 2;
+
+            // Apply scale and centering
+            canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+            canvas.style.transformOrigin = 'top left';
+            canvas.dataset.scale = scale; // Save scale for reference
+
+            // Generate vanishing points
+            vanishingPoints = Array.from({ length: numPoints }, () => ({
+                x: Math.random() * width,
+                y: Math.random() * height
+            }));
+
+            drawGrid(numRays);
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scale = parseFloat(canvas.dataset.scale);
+            const x = (e.clientX - rect.left) / scale;
+            const y = (e.clientY - rect.top) / scale;
+            const diameter = 2 * Math.min(canvas.width, canvas.height) * 0.01;
+
+            for (const point of vanishingPoints) {
+                if (Math.hypot(point.x - x, point.y - y) < diameter) {
+                    canvas.onmousemove = (moveEvent) => {
+                        const moveX = (moveEvent.clientX - rect.left) / scale;
+                        const moveY = (moveEvent.clientY - rect.top) / scale;
+                        point.x = moveX;
+                        point.y = moveY;
+                        drawGrid(document.getElementById('numRays').value);
+                    };
+                    break;
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            canvas.onmousemove = null;
+        });
+
+        saveBtn.addEventListener('click', () => {
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+
+            tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+            for (const point of vanishingPoints) {
+                for (let i = 0; i < document.getElementById('numRays').value; i++) {
+                    const angle = (2 * Math.PI / document.getElementById('numRays').value) * i;
+                    tempCtx.beginPath();
+                    tempCtx.moveTo(point.x, point.y);
+                    tempCtx.lineTo(
+                        point.x + Math.cos(angle) * canvas.width,
+                        point.y + Math.sin(angle) * canvas.height
+                    );
+                    tempCtx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                    tempCtx.stroke();
+                }
+            }
+
+            const link = document.createElement('a');
+            link.download = 'vanishing-point-grid.png';
+            link.href = tempCanvas.toDataURL('image/png');
+            link.click();
+        });
+
+        function drawGrid(numRays) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (const point of vanishingPoints) {
+                for (let i = 0; i < numRays; i++) {
+                    const angle = (2 * Math.PI / numRays) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(point.x, point.y);
+                    ctx.lineTo(
+                        point.x + Math.cos(angle) * Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height),
+                        point.y + Math.sin(angle) * Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height),
+                    );
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.stroke();
+                }
+
+                ctx.beginPath();
+                ctx.arc(
+                    point.x, 
+                    point.y, 
+                    Math.min(canvas.width, canvas.height) * 0.01, 
+                    0,
+                    2 * Math.PI
+                );
+                ctx.fillStyle = 'red';
+                ctx.fill();
+            }
+        }
+    </script>
+</body>
+</html>
