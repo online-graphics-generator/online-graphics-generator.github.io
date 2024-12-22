@@ -334,6 +334,32 @@
             canvas.onmousemove = null;
         });
 
+        // Touch Events
+        canvas.addEventListener('touchstart', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scale = parseFloat(canvas.dataset.scale);
+            const x = (e.touches[0].clientX - rect.left) / scale;
+            const y = (e.touches[0].clientY - rect.top) / scale;
+            const diameter = 2 * Math.min(canvas.width, canvas.height) * 0.01;
+        
+            for (const point of vanishingPoints) {
+                if (Math.hypot(point.x - x, point.y - y) < diameter) {
+                    canvas.ontouchmove = (moveEvent) => {
+                        const moveX = (moveEvent.touches[0].clientX - rect.left) / scale;
+                        const moveY = (moveEvent.touches[0].clientY - rect.top) / scale;
+                        point.x = moveX;
+                        point.y = moveY;
+                        drawGrid(document.getElementById('numRays').value);
+                    };
+                    break;
+                }
+            }
+        });
+        
+        canvas.addEventListener('touchend', () => {
+            canvas.ontouchmove = null;
+        });
+
         saveBtn.addEventListener('click', () => {
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
