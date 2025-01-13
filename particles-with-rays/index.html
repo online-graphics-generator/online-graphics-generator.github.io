@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+
+  <title>Particles with Rays</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #f0f0f5;
+    }
+    canvas {
+      border: 1px solid black;
+      display: block;
+      margin: 20px auto;
+      max-width: 100%;
+      height: auto;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      width: 90%;
+      max-width: 1000px;
+    }
+
+    .controls label,
+    .controls button {
+      margin: 5px 0;
+      font-size: 1rem;
+      color: #333;
+    }
+
+    .controls input,
+    .controls select,
+    .controls button {
+      padding: 8px 10px;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      outline: none;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    .controls button {
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .controls button:hover {
+      background-color: #0056b3;
+    }
+
+    .coordinates {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin: 20px 0;
+      width: 90%;
+      max-width: 1000px;
+    }
+
+    .coordinates label {
+      font-size: 1rem;
+      color: #555;
+      display: flex;
+      align-items: center;
+    }
+
+    .coordinates input {
+      padding: 8px;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      outline: none;
+      width: 70px;
+      text-align: center;
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 1.5rem;
+      }
+
+      .controls label,
+      .coordinates label {
+        font-size: 0.9rem;
+      }
+
+      .controls input,
+      .controls select,
+      .coordinates input {
+        font-size: 0.9rem;
+        padding: 6px;
+      }
+
+      .controls button {
+        font-size: 0.9rem;
+        padding: 6px 8px;
+      }
+    }
+
+
+    /* Modal Button */
+    .modal-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 15px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    }
+
+    .modal-btn:hover {
+    background-color: #0056b3;
+    }
+
+    /* The Modal (hidden by default) */
+    .modal {
+    display: none; /* Hidden by default */
+    position: fixed; /* Stay in place */
+    z-index: 1000; /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgba(0, 0, 0, 0.8); /* Black with opacity */
+    }
+
+    /* Modal Content */
+    .modal-content {
+    background-color: #fff;
+    margin: 15% auto; /* 15% from the top and centered */
+    padding: 20px;
+    border-radius: 10px;
+    width: 80%; /* Could be more or less, depending on screen size */
+    max-width: 600px;
+    text-align: left;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Close Button */
+    .close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    }
+
+    .close:hover,
+    .close:focus {
+    color: black;
+    text-decoration: none;
+    }
+
+    .buy-coffee-button {
+		background-color: #ff813f;
+		color: #fff;
+		padding: 15px 30px;
+		font-size: 1rem;
+		border: none;
+		border-radius: 8px;
+		cursor: pointer;
+		transition: background-color 0.3s;
+		width: 100%;
+		max-width: 200px;
+		text-align: center;
+	}
+
+	.buy-coffee-button:hover {
+		background-color: #e76b2f;
+	}
+
+  </style>
+</head>
+<body>
+  <h1>Particles with Rays <button id="open-modal" class="modal-btn">?</button></h1>
+  <!-- Button to open modal -->
+
+
+<!-- Modal -->
+<div id="info-modal" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <h2>About</h2>
+    <p>This application allows the creation of some really interesting visual effects and interference patterns that can be static or animated.</p>
+
+    <h2>Instructions</h2>
+    <p>1. Click anywhere on the canvas to create a particle.</p>
+    <p>2. Use the controls to set particle properties such as color, rays, and length.</p>
+    <p>3. Drag a particle to move it, or select it to modify its properties using the input fields.</p>
+    <p>4. Use the "Start Animation" button to begin animations, and export videos using the export button.</p>
+
+    <h2>Credits</h2>
+    <p>Developed by <a style="text-decoration: none" href="https://www.instagram.com/creatioexnihil00/">creatioexnihil00</a></p>
+    <p>Built using JavaScript, HTML, and CSS.</p>
+    <p>Love what you see? ☕ Fuel my creativity by buying me a coffee! Every sip counts!</p>
+	<a href="https://www.buymeacoffee.com/creatioexnihilo" target="_blank">
+		<button class="buy-coffee-button">☕ Buy Me a Coffee</button>
+	</a>
+  </div>
+</div>
+
+
+  <div class="controls">
+    <label>Canvas Width: <input type="number" id="canvasWidth" min="100" value="1000"></label>
+    <label>Canvas Height: <input type="number" id="canvasHeight" min="100" value="1000"></label>
+    <button id="resize-canvas">Resize Canvas</button>
+    <button id="clear-canvas">Clear Canvas</button>
+    <br>
+    <label>Color: 
+      <select id="color">
+        <option value="red">Red</option>
+        <option value="green">Green</option>
+        <option value="blue">Blue</option>
+      </select>
+    </label>
+    <label>Number of Rays: <input type="number" id="rays" min="1" value="100"></label>
+    <label>Ray Length: <input type="number" id="rayLength" min="10" value="1500"></label>
+
+    
+    <button id="remove-last">Remove Last Particle</button>
+    <button id="save-image">Save Image</button>
+    <button id="export-video">Export Video</button>
+    <label for="video-duration">Duration (1-30 seconds)</label>
+    <input type="number" id="video-duration" min="1" max="30" value="3" step="1">
+    <button id="start-animation">Start Animation</button>
+    <button id="copy-link">Share Link</button>
+  </div>
+  <div class="coordinates" id="coordinates">
+    Selected Particle: X=<input type="number" id="particleX" value="" disabled>, Y=<input type="number" id="particleY" value="" disabled>, Rotation=<input type="number" id="particleRotation" value="" disabled>, Orbit Speed=<input type="number" id="particleOrbit" value="" disabled>
+  </div>
+  <canvas id="particleCanvas" width="1000" height="1000"></canvas>
+
+  <script>
+    const canvas = document.getElementById('particleCanvas');
+    const ctx = canvas.getContext('2d');
+    const coordinatesDisplay = document.getElementById('coordinates');
+    const particleXInput = document.getElementById('particleX');
+    const particleYInput = document.getElementById('particleY');
+    const particleRotationInput = document.getElementById('particleRotation');
+    const particleOrbitInput = document.getElementById('particleOrbit');
+
+    const particles = [];
+    let isDragging = false;
+    let draggedParticle = null;
+    let animationRunning = false;
+
+    document.getElementById('resize-canvas').addEventListener('click', () => {
+      const newWidth = parseInt(document.getElementById('canvasWidth').value);
+      const newHeight = parseInt(document.getElementById('canvasHeight').value);
+
+      canvas.width = Math.min(newWidth, window.innerWidth - 40);
+      canvas.height = Math.min(newHeight, window.innerHeight - 100);
+
+      drawParticles();
+    });
+
+    // aici
+    canvas.addEventListener('click', (event) => {
+        if (isDragging) return; // Don't create/select if already dragging
+
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        // Check if the click is near an existing particle
+        let clickedParticle = null;
+        for (let particle of particles) {
+            const distance = Math.sqrt((particle.x - x) ** 2 + (particle.y - y) ** 2);
+            if (distance < 10) { // If click is within a radius of 10px
+                clickedParticle = particle;
+                break;
+            }
+        }
+
+        if (clickedParticle) {
+            // Select the existing particle
+            draggedParticle = clickedParticle;
+            updateCoordinatesInputs(draggedParticle);
+        } else {
+            // Create a new particle
+            const color = document.getElementById('color').value;
+            const rays = parseInt(document.getElementById('rays').value);
+            const rayLength = parseInt(document.getElementById('rayLength').value);
+
+            const newParticle = {
+                x,
+                y,
+                color,
+                rays,
+                rayLength,
+                rotation: 0,
+                rotationSpeed: 0,
+                orbitAngle: 0,
+                orbitSpeed: 0,
+                orbitRadius: Math.sqrt((x - canvas.width / 2) ** 2 + (y - canvas.height / 2) ** 2),
+                initialX: x,
+                initialY: y,
+            };
+
+            particles.push(newParticle);
+
+            // Automatically select the new particle
+            draggedParticle = newParticle;
+            updateCoordinatesInputs(draggedParticle);
+        }
+
+        // Redraw particles
+        drawParticles();
+    });
+
+    canvas.addEventListener('mousedown', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+
+      for (let particle of particles) {
+        const distance = Math.sqrt((particle.x - x) ** 2 + (particle.y - y) ** 2);
+        if (distance < 10) {
+          isDragging = true;
+          draggedParticle = particle;
+          updateCoordinatesInputs(draggedParticle);
+          break;
+        }
+      }
+    });
+
+    canvas.addEventListener('mousemove', (event) => {
+      if (!isDragging || !draggedParticle) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+
+      draggedParticle.x = x;
+      draggedParticle.y = y;
+      draggedParticle.initialX = x;
+      draggedParticle.initialY = y;
+      draggedParticle.orbitRadius = Math.sqrt((x - canvas.width / 2) ** 2 + (y - canvas.height / 2) ** 2);
+      updateCoordinatesInputs(draggedParticle);
+      drawParticles();
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    particleXInput.addEventListener('input', () => {
+      if (draggedParticle) {
+        draggedParticle.x = parseFloat(particleXInput.value);
+        draggedParticle.initialX = draggedParticle.x;
+        draggedParticle.orbitRadius = Math.sqrt((draggedParticle.x - canvas.width / 2) ** 2 + (draggedParticle.y - canvas.height / 2) ** 2);
+        drawParticles();
+      }
+    });
+
+    particleYInput.addEventListener('input', () => {
+      if (draggedParticle) {
+        draggedParticle.y = parseFloat(particleYInput.value);
+        draggedParticle.initialY = draggedParticle.y;
+        draggedParticle.orbitRadius = Math.sqrt((draggedParticle.x - canvas.width / 2) ** 2 + (draggedParticle.y - canvas.height / 2) ** 2);
+        drawParticles();
+      }
+    });
+
+    particleRotationInput.addEventListener('input', () => {
+      if (draggedParticle) {
+        draggedParticle.rotationSpeed = parseFloat(particleRotationInput.value);
+      }
+    });
+
+    particleOrbitInput.addEventListener('input', () => {
+      if (draggedParticle) {
+        draggedParticle.orbitSpeed = parseFloat(particleOrbitInput.value);
+      }
+    });
+
+    function updateCoordinatesInputs(particle) {
+      particleXInput.value = particle.x.toFixed(1);
+      particleYInput.value = particle.y.toFixed(1);
+      particleRotationInput.value = particle.rotationSpeed.toFixed(1);
+      particleOrbitInput.value = particle.orbitSpeed.toFixed(1);
+      particleXInput.disabled = false;
+      particleYInput.disabled = false;
+      particleRotationInput.disabled = false;
+      particleOrbitInput.disabled = false;
+    }
+
+    function drawParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      particles.forEach((particle) => {
+        if (animationRunning) {
+          particle.rotation += particle.rotationSpeed / 100;
+          particle.orbitAngle += particle.orbitSpeed / 100;
+
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+
+          if (particle.orbitSpeed !== 0) {
+            particle.x = centerX + particle.orbitRadius * Math.cos(particle.orbitAngle);
+            particle.y = centerY + particle.orbitRadius * Math.sin(particle.orbitAngle);
+          } else {
+            particle.x = particle.initialX;
+            particle.y = particle.initialY;
+          }
+        } else {
+          particle.x = particle.initialX;
+          particle.y = particle.initialY;
+        }
+
+        // Draw the center point
+        ctx.fillStyle = particle.color;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw the rays
+        for (let i = 0; i < particle.rays; i++) {
+          const angle = particle.rotation + (i * 2 * Math.PI) / particle.rays;
+          const rayX = particle.x + particle.rayLength * Math.cos(angle);
+          const rayY = particle.y + particle.rayLength * Math.sin(angle);
+
+          ctx.strokeStyle = particle.color;
+          ctx.beginPath();
+          ctx.moveTo(particle.x, particle.y);
+          ctx.lineTo(rayX, rayY);
+          ctx.stroke();
+        }
+      });
+
+      requestAnimationFrame(drawParticles);
+    }
+
+    document.getElementById('clear-canvas').addEventListener('click', () => {
+      particles.length = 0;
+      drawParticles();
+      clearCoordinatesInputs();
+    });
+
+    document.getElementById('remove-last').addEventListener('click', () => {
+      if (draggedParticle === particles[particles.length - 1]) {
+        draggedParticle = null;
+        clearCoordinatesInputs();
+      }
+      particles.pop();
+      drawParticles();
+    });
+
+    document.getElementById('save-image').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'canvas-image.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    });
+
+    document.getElementById('start-animation').addEventListener('click', () => {
+      animationRunning = !animationRunning;
+    });
+
+    document.getElementById('copy-link').addEventListener('click', () => {
+      const params = new URLSearchParams();
+      params.set('particles', btoa(JSON.stringify(particles)));
+
+      const link = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+
+      navigator.clipboard.writeText(link).then(() => {
+        alert('Link copied to clipboard!');
+      }).catch(() => {
+        alert('Failed to copy link to clipboard.');
+      });
+    });
+
+    function clearCoordinatesInputs() {
+      particleXInput.value = "";
+      particleYInput.value = "";
+      particleRotationInput.value = "";
+      particleOrbitInput.value = "";
+      particleXInput.disabled = true;
+      particleYInput.disabled = true;
+      particleRotationInput.disabled = true;
+      particleOrbitInput.disabled = true;
+    }
+
+    //
+    document.getElementById('export-video').addEventListener('click', () => {
+        const durationInput = document.getElementById('video-duration');
+        const duration = Math.max(1, Math.min(30, parseInt(durationInput.value + 1))) * 1000;
+
+        drawParticles();
+        startRecording();
+
+        function startRecording() {
+            const chunks = []; // here we will store our recorded media chunks (Blobs)
+            const stream = canvas.captureStream(); // grab our canvas MediaStream
+            const rec = new MediaRecorder(stream); // init the recorder
+            // every time the recorder has new data, we will store it in our array
+            rec.ondataavailable = e => chunks.push(e.data);
+            // only when the recorder stops, we construct a complete Blob from all the chunks
+            rec.onstop = e => exportVid(new Blob(chunks, {type: 'video/webm'}));
+            
+            rec.start();
+            setTimeout(()=>rec.stop(), duration);
+        }
+
+        function exportVid(blob) {
+            const vid = document.createElement('video');
+            vid.src = URL.createObjectURL(blob);
+            vid.controls = true;
+            document.body.appendChild(vid);
+            const a = document.createElement('a');
+            a.download = 'myvid.webm';
+            a.href = vid.src;
+            a.textContent = 'download the video';
+            document.body.appendChild(a);
+        }
+    });
+
+
+    
+    //
+
+    window.addEventListener('load', () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('particles')) {
+        const data = JSON.parse(atob(params.get('particles')));
+        particles.push(...data);
+
+        if (particles.length > 0) {
+          draggedParticle = particles[0];
+          updateCoordinatesInputs(draggedParticle);
+        }
+
+        drawParticles();
+      }
+    });
+
+    window.addEventListener('beforeunload', () => {
+      const params = new URLSearchParams();
+      params.set('particles', btoa(JSON.stringify(particles)));
+      history.replaceState(null, '', `?${params.toString()}`);
+    });
+
+    drawParticles();
+
+    // Get the modal
+    const modal = document.getElementById("info-modal");
+
+    // Get the button that opens the modal
+    const openModalBtn = document.getElementById("open-modal");
+
+    // Get the <span> element that closes the modal
+    const closeModalBtn = document.querySelector(".close");
+
+    // Open the modal when the button is clicked
+    openModalBtn.addEventListener("click", () => {
+    modal.style.display = "block";
+    });
+
+    // Close the modal when the close button is clicked
+    closeModalBtn.addEventListener("click", () => {
+    modal.style.display = "none";
+    });
+
+    // Close the modal when clicking outside the modal content
+    window.addEventListener("click", (event) => {
+    if (event.target === modal) {
+        modal.style.display = "none";
+    }
+    });
+
+  </script>
+</body>
+</html>
