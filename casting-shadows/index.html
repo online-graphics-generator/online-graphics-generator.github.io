@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Shadows Correctly Projected from Vertices</title>
+<style>
+  :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#222;background:#f5f5f5}
+  body{margin:0;display:grid;place-items:center;min-height:100vh;padding:18px;box-sizing:border-box}
+  main{width:min(1000px,100%);background:white;border-radius:18px;box-shadow:0 10px 35px #0002;padding:18px}
+  h1{font-size:22px;margin:0 0 6px} p{margin:0 0 14px;color:#555;line-height:1.35}
+  .wrap{display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:start}
+  canvas{width:100%;height:auto;border:1px solid #ddd;border-radius:14px;background:linear-gradient(#eef6ff 0 48%,#ece7dc 48%)}
+  aside{border:1px solid #ddd;border-radius:14px;padding:14px;background:#fafafa}
+  label{display:block;font-weight:650;margin-top:12px} input[type=range]{width:100%}
+  .row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;color:#555;font-size:14px}
+  .tip{margin-top:14px;padding:10px;border-radius:12px;background:#fff7d6;color:#5f4a00;font-size:14px}
+  select,button{width:100%;padding:8px;border-radius:10px;border:1px solid #ccc;background:white}
+  button{cursor:pointer;margin-top:12px;font-weight:650}
+  button.active{background:#e8f1ff;border-color:#7aa7e8;color:#174b8f}
+  .check{display:flex;gap:8px;align-items:center;font-weight:500;color:#444;margin-top:12px}
+  @media(max-width:760px){.wrap{grid-template-columns:1fr}aside{order:-1}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Shadows: Parallel Light vs. Point Light</h1>
+  <p>Move the light source. The solid lines run from the light toward the vertices; the dashed lines continue the rays beyond the vertices to the shadow points on the ground.</p>
+  <div class="wrap">
+    <canvas id="c" width="900" height="560"></canvas>
+    <aside>
+      <label>Light type</label>
+      <select id="type">
+        <option value="parallel">Parallel rays — like sunlight</option>
+        <option value="point">Diverging rays — bulb/neon light</option>
+      </select>
+
+      <button id="transparentBtn" type="button">Transparent cube: OFF</button>
+
+      <label class="row"><span>Left / right</span><b id="vx"></b></label>
+      <input id="lx" type="range" min="-5" max="5" step="0.1" value="-4.0">
+      <label class="row"><span>Front / back</span><b id="vz"></b></label>
+      <input id="lz" type="range" min="-5" max="5" step="0.1" value="-3.0">
+      <label class="row"><span>Light height</span><b id="vy"></b></label>
+      <input id="ly" type="range" min="2.2" max="8" step="0.1" value="5">
+      <label class="check"><input id="showLabels" type="checkbox" checked> show V1–V8 and P1–P8</label>
+      <div class="tip" id="note"></div>
+    </aside>
+  </div>
+</main>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const $ = id => document.getElementById(id);
+const type = $('type'), lx = $('lx'), ly = $('ly'), lz = $('lz'), showLabels=$('showLabels');
+const transparentBtn=$('transparentBtn');
+const vx=$('vx'), vy=$('vy'), vz=$('vz'), note=$('note');
+
+let cubeTransparent = false;
+
+const cube = {x:-1.05, z:-0.8, w:2.1, d:1.6, h:2.1};
+const groundY = 0;
+const S = 70, cx = 455, cy = 365;
+function iso(p){ return {x: cx + (p.x-p.z)*S, y: cy - p.y*S + (p.x+p.z)*S*0.38}; }
+function poly(points, fill, stroke='#222', width=1){
+  ctx.beginPath(); points.forEach((p,i)=>{const q=iso(p); i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)}); ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); ctx.strokeStyle=stroke; ctx.lineWidth=width; ctx.stroke();
+}
+function line(a,b,color='#b12',width=1.4,dash=[]){
+  const A=iso(a), B=iso(b); ctx.save(); ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.strokeStyle=color; ctx.lineWidth=width; ctx.stroke(); ctx.restore();
+}
+function dot(p,r,color,stroke='white'){const q=iso(p); ctx.beginPath(); ctx.arc(q.x,q.y,r,0,Math.PI*2); ctx.fillStyle=color; ctx.fill(); if(stroke){ctx.strokeStyle=stroke; ctx.lineWidth=1.5; ctx.stroke();}}
+function label(text,p,dx=0,dy=0,color='#222'){const q=iso(p); ctx.fillStyle=color; ctx.font='15px system-ui'; ctx.fillText(text,q.x+dx,q.y+dy);}
+function vertices(){
+  const {x,z,w,d,h}=cube; return [
+    {x,z,y:0,n:'V1'},{x:x+w,z,y:0,n:'V2'},{x:x+w,z:z+d,y:0,n:'V3'},{x,z:z+d,y:0,n:'V4'},
+    {x,z,y:h,n:'V5'},{x:x+w,z,y:h,n:'V6'},{x:x+w,z:z+d,y:h,n:'V7'},{x,z:z+d,y:h,n:'V8'}
+  ];
+}
+function projectPoint(v,L,mode){
+  if(mode==='point'){
+    const t = (groundY - L.y) / (v.y - L.y);
+    return {x:L.x + t*(v.x-L.x), y:0, z:L.z + t*(v.z-L.z)};
+  }
+  const dir = {x: -L.x, y: -L.y, z: -L.z};
+  const t = (groundY - v.y) / dir.y;
+  return {x:v.x + t*dir.x, y:0, z:v.z + t*dir.z};
+}
+function convexHull(pts){
+  const arr=[...pts].sort((a,b)=>a.x===b.x?a.z-b.z:a.x-b.x);
+  const cross=(o,a,b)=>(a.x-o.x)*(b.z-o.z)-(a.z-o.z)*(b.x-o.x);
+  const lower=[]; for(const p of arr){while(lower.length>=2 && cross(lower.at(-2),lower.at(-1),p)<=0) lower.pop(); lower.push(p)}
+  const upper=[]; for(let i=arr.length-1;i>=0;i--){const p=arr[i]; while(upper.length>=2 && cross(upper.at(-2),upper.at(-1),p)<=0) upper.pop(); upper.push(p)}
+  return lower.slice(0,-1).concat(upper.slice(0,-1));
+}
+
+function add(a,b){return {x:a.x+b.x,y:a.y+b.y,z:a.z+b.z}}
+function sub(a,b){return {x:a.x-b.x,y:a.y-b.y,z:a.z-b.z}}
+function mul(a,k){return {x:a.x*k,y:a.y*k,z:a.z*k}}
+
+function drawRayForVertex(vertex, shadow, L, mode, idx){
+  if(mode==='point'){
+    line(L, vertex, '#d45732', 1.15, []);
+    if(vertex.y > 0.01) line(vertex, shadow, '#111', 1.45, [6,5]);
+  } else {
+    const dir = {x:-L.x,y:-L.y,z:-L.z};
+    const start = sub(vertex, mul(dir, .55));
+    line(start, vertex, '#d45732', 1.15, []);
+    if(vertex.y > 0.01) line(vertex, shadow, '#111', 1.45, [6,5]);
+  }
+  dot(vertex, idx<4?3.8:4.6, idx<4?'#1f77b4':'#0057d8');
+  dot(shadow, 4.2, '#111', null);
+  if(showLabels.checked){
+    label(vertex.n, vertex, 5, idx<4?15:-7, '#00459a');
+    label('P'+(idx+1), shadow, 5, 13, '#111');
+  }
+}
+
+function drawCube(){
+  const v=vertices();
+  const a = cubeTransparent ? .16 : 1;
+  const edge = cubeTransparent ? '#111' : '#111';
+  const edgeW = cubeTransparent ? 1.35 : 1.1;
+
+  poly([v[0],v[1],v[2],v[3]], `rgba(207,207,207,${cubeTransparent?.10:.53})`, '#777', .8);
+  poly([v[4],v[5],v[6],v[7]], `rgba(247,247,247,${a})`, edge, edgeW);
+  poly([v[1],v[2],v[6],v[5]], `rgba(215,215,215,${a})`, edge, edgeW);
+  poly([v[0],v[3],v[7],v[4]], `rgba(238,238,238,${a})`, edge, edgeW);
+  poly([v[3],v[2],v[6],v[7]], `rgba(189,189,189,${a})`, edge, edgeW);
+
+  [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(e=>line(v[e[0]],v[e[1]],edge,edgeW));
+}
+
+function drawGround(){
+  poly([{x:-5,z:-4,y:0},{x:5,z:-4,y:0},{x:5,z:5,y:0},{x:-5,z:5,y:0}], '#e7dfd0', '#d0c4ad');
+  for(let i=-5;i<=5;i++){line({x:i,z:-4,y:0},{x:i,z:5,y:0},'#d4c8b4',0.6); line({x:-5,z:i,y:0},{x:5,z:i,y:0},'#d4c8b4',0.6)}
+}
+
+function draw(){
+  const L={x:+lx.value,y:+ly.value,z:+lz.value}; const mode=type.value;
+  vx.textContent=L.x.toFixed(1); vy.textContent=L.y.toFixed(1); vz.textContent=L.z.toFixed(1);
+
+  note.textContent = cubeTransparent
+    ? 'Transparent cube: the imaginary rays passing through the inside/back of the cube are visible.'
+    : (mode==='parallel'
+      ? 'Solid red = parallel incident rays. Dashed black = continuation of the rays on the shadow side.'
+      : 'The yellow point is the light source. Solid red = light → vertex. Dashed black = vertex → shadow point.');
+
+  ctx.clearRect(0,0,900,560); 
+  drawGround();
+
+  const v=vertices(); 
+  const shadowPts=v.map(p=>projectPoint(p,L,mode)); 
+  const hull=convexHull(shadowPts);
+
+  poly(hull, 'rgba(0,0,0,.42)', 'rgba(0,0,0,.55)', 1.5);
+
+  if(cubeTransparent){
+    // In transparent mode, first draw the translucent cube,
+    // then draw the rays over it so the imaginary path through the cube remains visible.
+    drawCube();
+    v.forEach((p,i)=>drawRayForVertex(p, shadowPts[i], L, mode, i));
+  } else {
+    // Default mode: the rays extend to the vertices, while the opaque cube covers hidden paths.
+    v.forEach((p,i)=>drawRayForVertex(p, shadowPts[i], L, mode, i));
+    drawCube();
+  }
+
+  v.forEach((p,i)=>{ 
+    dot(p, i<4?3.8:4.6, i<4?'#1f77b4':'#0057d8'); 
+    if(showLabels.checked) label(p.n,p,5,i<4?15:-7,'#00459a'); 
+  });
+
+  if(mode==='point') { dot(L,9,'#ffd23f'); label('light source',L,12,-8); }
+  else { label('light direction', {x:-3.8,y:3.2,z:-3.2},0,0); }
+  label('ground plane', {x:-4.6,y:0,z:4.3},0,0);
+}
+
+transparentBtn.addEventListener('click',()=>{
+  cubeTransparent = !cubeTransparent;
+  transparentBtn.textContent = 'Transparent cube: ' + (cubeTransparent ? 'ON' : 'OFF');
+  transparentBtn.classList.toggle('active', cubeTransparent);
+  draw();
+});
+
+[type,lx,ly,lz,showLabels].forEach(el=>el.addEventListener('input',draw)); 
+draw();
+</script>
+</body>
+</html>
