@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+  <title>Sculpt Materials — 3D Studio</title>
+  <link rel="stylesheet" href="studio.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body {
+      display: grid;
+      grid-template-columns: 280px minmax(360px, 1fr) 310px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Gill Sans", "Trebuchet MS", sans-serif;
+    }
+    .panel { background: var(--panel); overflow-y: auto; min-width: 0; }
+    .panel-left { border-right: 1px solid var(--border); }
+    .panel-right { border-left: 1px solid var(--border); }
+    .section { padding: 14px; border-bottom: 1px solid var(--border); }
+    h1, h2 { margin: 0; text-transform: uppercase; letter-spacing: .1em; }
+    h1 { font-size: 13px; opacity: .75; }
+    h2 { font-size: 10px; opacity: .5; margin-bottom: 9px; }
+    p { margin: 0; }
+    .subtle { color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .row { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+    .wrap { flex-wrap: wrap; }
+    button { padding: 6px 9px; font-size: 10px; text-transform: uppercase; letter-spacing: .045em; }
+    button.active { background: #1c3b25; border-color: var(--accent); color: #b9ffcc; }
+    select, input[type="text"], input[type="number"] { width: 100%; padding: 6px 8px; font-size: 11px; }
+    input[type="number"].range-number { width: 72px; margin-top: 5px; padding: 5px 6px; font: 10px monospace; }
+    input[type="color"] { width: 40px; height: 28px; padding: 0; background: transparent; border: 1px solid var(--border-strong); }
+    input[type="range"] { width: 100%; }
+    .control { margin-top: 9px; }
+    .control-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; }
+    label { font-size: 9px; text-transform: uppercase; letter-spacing: .055em; opacity: .58; }
+    output { font: 10px monospace; opacity: .75; }
+    .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+    .tool-grid button { min-width: 0; }
+    .check-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 8px; }
+    .check-grid label { display: flex; align-items: center; gap: 4px; opacity: .75; }
+    .check-grid input { accent-color: var(--accent); }
+    #stage { position: relative; min-width: 0; overflow: hidden; background: #080a08; }
+    #sculpt-view { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+    #sculpt-view.sculpting, #sculpt-view.painting { cursor: crosshair; }
+    #sculpt-view.dragging { cursor: grabbing; }
+    .stage-toolbar {
+      position: absolute; top: 12px; left: 12px; right: 12px;
+      display: flex; justify-content: space-between; gap: 10px; pointer-events: none;
+    }
+    .stage-toolbar > * { pointer-events: auto; }
+    .stage-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    #back { color: var(--text); text-decoration: none; opacity: .65; border: 1px solid var(--border); background: rgba(10,18,10,.88); padding: 6px 9px; font-size: 10px; text-transform: uppercase; }
+    #stage-status { position: absolute; left: 14px; bottom: 12px; font-size: 10px; opacity: .45; pointer-events: none; }
+    #stage-hint { position: absolute; right: 14px; bottom: 12px; font-size: 10px; opacity: .28; text-transform: uppercase; pointer-events: none; }
+    .layer-list { display: flex; flex-direction: column; gap: 5px; }
+    .layer-item {
+      display: grid; grid-template-columns: 18px 1fr auto; gap: 7px; align-items: center;
+      border: 1px solid var(--border); background: #0b120b; padding: 7px; cursor: pointer;
+    }
+    .layer-item.selected { border-color: var(--accent); background: #132819; }
+    .layer-swatch { width: 18px; height: 18px; border: 1px solid rgba(255,255,255,.18); background-size: cover; }
+    .layer-name { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .layer-kind { font-size: 8px; opacity: .4; text-transform: uppercase; }
+    .layer-visible { accent-color: var(--accent); }
+    .texture-wrap { margin-top: 9px; aspect-ratio: 1; border: 1px solid var(--border); background: #111; }
+    #texture-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .callout { padding: 8px; background: #101d12; border: 1px solid #28472e; font-size: 10px; line-height: 1.45; color: var(--muted); }
+    .hidden { display: none !important; }
+    @media (max-width: 1100px) {
+      body { grid-template-columns: 245px minmax(330px, 1fr) 280px; }
+    }
+  </style>
+</head>
+<body>
+  <aside class="panel panel-left" aria-label="Sculpt controls">
+    <section class="section">
+      <h1>Sculpt Materials</h1>
+      <p class="subtle" style="margin-top:7px">Shape dense meshes, paint layered materials, blend artistic effects, and export portable 3D assets.</p>
+    </section>
+
+    <section class="section">
+      <h2>Base object</h2>
+      <div class="row wrap">
+        <button type="button" data-base="sphere" class="active">Sphere</button>
+        <button type="button" data-base="cube">Cube</button>
+        <button type="button" data-base="torus">Torus</button>
+        <button type="button" data-base="plane">Plane</button>
+      </div>
+      <div class="row">
+        <button type="button" id="import-mesh" class="primary-button">Import asset JSON</button>
+      </div>
+      <div class="control">
+        <label for="asset-name">Object name</label>
+        <input id="asset-name" type="text" maxlength="80" value="Sculpted object">
+      </div>
+      <input id="mesh-file" type="file" accept=".json,application/json" hidden>
+    </section>
+
+    <section class="section">
+      <h2>Interaction mode</h2>
+      <div class="tool-grid" id="mode-tools">
+        <button type="button" data-mode="orbit">Orbit</button>
+        <button type="button" data-mode="sculpt" class="active">Sculpt</button>
+        <button type="button" data-mode="paint">Paint</button>
+      </div>
+    </section>
+
+    <section class="section" id="sculpt-panel">
+      <h2>Sculpt brush</h2>
+      <div class="tool-grid" id="sculpt-tools">
+        <button type="button" data-tool="inflate" class="active">Inflate</button>
+        <button type="button" data-tool="deflate">Deflate</button>
+        <button type="button" data-tool="smooth">Smooth</button>
+        <button type="button" data-tool="flatten">Flatten</button>
+        <button type="button" data-tool="pinch">Pinch</button>
+        <button type="button" data-tool="noise">Noise</button>
+      </div>
+      <div class="control">
+        <div class="control-head"><label for="sculpt-radius">Radius</label><output id="sculpt-radius-v">0.28</output></div>
+        <input id="sculpt-radius" type="range" min="0.04" max="0.8" step="0.01" value="0.28">
+      </div>
+      <div class="control">
+        <div class="control-head"><label for="sculpt-strength">Strength</label><output id="sculpt-strength-v">0.06</output></div>
+        <input id="sculpt-strength" type="range" min="0.005" max="0.20" step="0.005" value="0.06">
+      </div>
+      <div class="control">
+        <div class="control-head"><label for="sculpt-falloff">Soft falloff</label><output id="sculpt-falloff-v">0.75</output></div>
+        <input id="sculpt-falloff" type="range" min="0.1" max="1" step="0.05" value="0.75">
+      </div>
+      <div class="check-grid">
+        <label><input id="symmetry-x" type="checkbox"> X</label>
+        <label><input id="symmetry-y" type="checkbox"> Y</label>
+        <label><input id="symmetry-z" type="checkbox"> Z</label>
+      </div>
+      <div class="row wrap">
+        <button type="button" id="undo">Undo</button>
+        <button type="button" id="redo">Redo</button>
+        <button type="button" id="reset-mesh" class="danger-button">Reset</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Shape operations</h2>
+      <div class="row wrap">
+        <button type="button" data-operation="organic">Organic</button>
+        <button type="button" data-operation="crystal">Crystal</button>
+        <button type="button" data-operation="erode">Erode</button>
+        <button type="button" data-operation="smooth-all">Smooth all</button>
+      </div>
+      <p class="subtle" style="margin-top:8px">Operations are mesh edits and can be undone.</p>
+    </section>
+  </aside>
+
+  <main id="stage">
+    <canvas id="sculpt-view" aria-label="Sculpted object preview"></canvas>
+    <div class="stage-toolbar">
+      <div class="stage-group">
+        <button type="button" id="reset-camera">Reset view</button>
+        <button type="button" id="wireframe-toggle">Wireframe: on</button>
+      </div>
+      <a id="back" href="index.html">← Studio</a>
+    </div>
+    <div id="stage-status">Sphere · 0 vertices</div>
+    <div id="stage-hint">Sculpt or paint directly on the visible surface · Scroll to zoom</div>
+  </main>
+
+  <aside class="panel panel-right" aria-label="Material controls">
+    <section class="section">
+      <h2>Material layers</h2>
+      <div id="layer-list" class="layer-list"></div>
+      <div class="row wrap">
+        <button type="button" id="add-paint-layer">+ Paint</button>
+        <select id="procedural-kind" aria-label="Procedural texture">
+          <option value="marble">Marble</option>
+          <option value="clouds">Clouds</option>
+          <option value="patina">Patina</option>
+          <option value="speckle">Speckle</option>
+          <option value="rings">Growth rings</option>
+          <option value="weave">Woven fibers</option>
+          <option value="tiles">Stone tiles</option>
+          <option value="cellular">Cellular</option>
+          <option value="topographic">Topographic</option>
+          <option value="cracks">Cracked paint</option>
+          <option value="brushed">Brushed metal</option>
+        </select>
+        <button type="button" id="add-procedural">+ Pattern</button>
+      </div>
+      <div class="two-col" style="margin-top:8px">
+        <div>
+          <label for="procedural-primary">Color A</label>
+          <input id="procedural-primary" type="color" value="#74d995">
+        </div>
+        <div>
+          <label for="procedural-secondary">Color B</label>
+          <input id="procedural-secondary" type="color" value="#17291d">
+        </div>
+      </div>
+      <div class="control">
+        <div class="control-head"><label for="procedural-scale">Pattern scale</label><output id="procedural-scale-v">9</output></div>
+        <input id="procedural-scale" type="range" min="2" max="40" step="1" value="9">
+      </div>
+      <div class="control">
+        <div class="control-head"><label for="procedural-detail">Pattern detail</label><output id="procedural-detail-v">0.60</output></div>
+        <input id="procedural-detail" type="range" min="0" max="1" step="0.01" value="0.60">
+      </div>
+      <div class="control">
+        <div class="control-head"><label for="procedural-contrast">Pattern contrast</label><output id="procedural-contrast-v">0.70</output></div>
+        <input id="procedural-contrast" type="range" min="0" max="1" step="0.01" value="0.70">
+      </div>
+      <div class="row wrap">
+        <button type="button" id="move-layer-up">Up</button>
+        <button type="button" id="move-layer-down">Down</button>
+        <button type="button" id="duplicate-layer">Duplicate</button>
+        <button type="button" id="delete-layer" class="danger-button">Delete</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Selected layer</h2>
+      <input id="layer-name" type="text" maxlength="50" aria-label="Layer name">
+      <div class="two-col" style="margin-top:8px">
+        <div>
+          <label for="blend-mode">Blend mode</label>
+          <select id="blend-mode">
+            <option value="source-over">Normal</option>
+            <option value="multiply">Multiply</option>
+            <option value="screen">Screen</option>
+            <option value="overlay">Overlay</option>
+            <option value="soft-light">Soft light</option>
+            <option value="lighter">Add</option>
+          </select>
+        </div>
+        <div>
+          <label for="layer-opacity">Opacity</label>
+          <input id="layer-opacity" type="range" min="0" max="1" step="0.01" value="1">
+        </div>
+      </div>
+      <div class="row">
+        <label for="paint-color">Color</label><input id="paint-color" type="color" value="#66d991">
+        <label for="paint-size">Size</label><input id="paint-size" type="range" min="2" max="100" value="28">
+      </div>
+      <div class="control">
+        <div class="control-head"><label for="paint-opacity">Brush opacity</label><output id="paint-opacity-v">0.70</output></div>
+        <input id="paint-opacity" type="range" min="0.05" max="1" step="0.05" value="0.70">
+      </div>
+      <div class="control">
+        <div class="control-head"><label for="paint-softness">Brush softness</label><output id="paint-softness-v">0.75</output></div>
+        <input id="paint-softness" type="range" min="0" max="1" step="0.05" value="0.75">
+      </div>
+      <div class="texture-wrap"><canvas id="texture-canvas" width="512" height="512"></canvas></div>
+      <div class="row wrap">
+        <button type="button" id="clear-layer">Clear layer</button>
+        <button type="button" id="upload-layer">Upload image</button>
+      </div>
+      <input id="layer-file" type="file" accept="image/*" hidden>
+    </section>
+
+    <section class="section">
+      <h2>Artistic finishing</h2>
+      <div class="row wrap">
+        <button type="button" data-effect="watercolor">Watercolor</button>
+        <button type="button" data-effect="grain">Grain</button>
+        <button type="button" data-effect="glaze">Glaze</button>
+        <button type="button" data-effect="posterize">Posterize</button>
+      </div>
+      <div class="control">
+        <div class="control-head"><label for="effect-strength">Effect strength</label><output id="effect-strength-v">0.45</output></div>
+        <input id="effect-strength" type="range" min="0.05" max="1" step="0.05" value="0.45">
+      </div>
+      <div class="callout">Effects are baked into a new layer, so they can be blended, reordered, faded, or removed instead of permanently flattening the material.</div>
+    </section>
+
+    <section class="section">
+      <h2>Texture to geometry</h2>
+      <div class="control">
+        <div class="control-head"><label for="texture-relief">Relief amount</label><output id="texture-relief-v">0.08</output></div>
+        <input id="texture-relief" type="range" min="-0.35" max="0.35" step="0.01" value="0.08">
+      </div>
+      <div class="control">
+        <div class="control-head"><label for="texture-midpoint">Neutral brightness</label><output id="texture-midpoint-v">0.50</output></div>
+        <input id="texture-midpoint" type="range" min="0" max="1" step="0.01" value="0.50">
+      </div>
+      <button type="button" id="bake-relief" class="primary-button">Bake texture as relief</button>
+      <p class="subtle" style="margin-top:8px">The composite material is sampled through UVs and moved along the mesh normals. This works on spheres, toruses, planes, cubes, and imported UV-mapped assets.</p>
+    </section>
+
+    <section class="section">
+      <h2>Extract / export</h2>
+      <div class="export-grid">
+        <button type="button" id="send-world" class="primary-button">Add to World</button>
+        <button type="button" id="export-studio">Studio JSON</button>
+        <button type="button" id="export-gltf">glTF</button>
+        <button type="button" id="export-obj">OBJ package</button>
+        <button type="button" id="export-stl">STL print mesh</button>
+        <button type="button" id="export-stl-relief">STL texture relief</button>
+        <button type="button" id="export-stl-color">Color STL experimental</button>
+        <button type="button" id="export-ply">PLY colors</button>
+        <button type="button" id="export-texture">Texture PNG</button>
+        <button type="button" id="export-height">Height PNG</button>
+      </div>
+      <p class="subtle" style="margin-top:8px">glTF keeps the real image texture. Standard STL has no UV/material channel. <strong>STL texture relief</strong> converts brightness into geometry; <strong>Color STL</strong> stores experimental per-triangle colour that some programs ignore. PLY stores sampled vertex colours.</p>
+    </section>
+  </aside>
+
+  <div id="toast" class="status-toast" role="status" aria-live="polite"></div>
+  <script src="studio-core.js"></script>
+  <script src="studio-procedural.js"></script>
+  <script src="studio-webgl.js"></script>
+  <script src="materials.js"></script>
+</body>
+</html>

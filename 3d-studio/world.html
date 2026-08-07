@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+  <title>World Builder - 3D Studio</title>
+  <link rel="stylesheet" href="studio.css">
+  <style>
+    * { margin: 0; padding: 0; }
+    body {
+      height: 100vh; overflow: hidden; display: grid;
+      grid-template-columns: 320px minmax(420px, 1fr) 330px;
+      background: var(--bg); color: var(--text);
+      font-family: "Gill Sans", "Trebuchet MS", sans-serif;
+    }
+    .panel { min-width: 0; background: var(--panel); overflow-y: auto; }
+    .panel-left { border-right: 1px solid var(--border); }
+    .panel-right { border-left: 1px solid var(--border); }
+    .panel-section { padding: 14px; border-bottom: 1px solid var(--border); }
+    h1, h2 { text-transform: uppercase; letter-spacing: .11em; }
+    h1 { font-size: .83rem; opacity: .68; }
+    h2 { font-size: .68rem; opacity: .45; margin-bottom: 10px; }
+    .subtle { font-size: 10px; line-height: 1.45; color: var(--muted); }
+    .row { display: flex; gap: 7px; align-items: center; margin-top: 8px; }
+    .row.wrap { flex-wrap: wrap; }
+    .row > button, .row > select { min-height: 29px; padding: 5px 8px; font-size: 10px; }
+    .row > button { flex: 1; }
+    .object-list { display: grid; gap: 5px; margin-top: 9px; }
+    .object-item {
+      display: grid; grid-template-columns: 12px 1fr auto; gap: 7px; align-items: center;
+      width: 100%; padding: 8px; text-align: left; color: var(--text);
+      background: #0d180d; border: 1px solid #1d311d;
+    }
+    .object-item.selected { border-color: var(--accent); background: #132819; }
+    .object-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--object-color, var(--accent)); }
+    .object-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+    .object-kind { font-size: 9px; opacity: .38; text-transform: uppercase; }
+    #stage { position: relative; min-width: 0; overflow: hidden; background: #080a08; }
+    #world-view { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+    #world-view.dragging { cursor: grabbing; }
+    #world-view.moving { cursor: move; }
+    #world-view.painting { cursor: crosshair; }
+    button.active { background: #1c3b25; border-color: var(--accent); color: #a8ffc0; }
+    .stage-toolbar {
+      position: absolute; left: 12px; top: 12px; right: 12px; display: flex;
+      justify-content: space-between; align-items: flex-start; pointer-events: none;
+    }
+    .stage-toolbar > * { pointer-events: auto; }
+    .stage-actions { display: flex; gap: 6px; }
+    .stage-actions button, #back { padding: 6px 9px; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+    #back { color: var(--text); text-decoration: none; opacity: .55; border: 1px solid var(--border); background: rgba(10,18,10,.8); }
+    .render-badge { padding:6px 9px; border:1px solid var(--border); background:rgba(8,14,9,.82); font:10px monospace; opacity:.72; }
+    .stage-hint { position: absolute; right: 14px; bottom: 12px; font-size: 10px; opacity: .3; text-transform: uppercase; letter-spacing: .06em; user-select: none; }
+    .control { margin-top: 9px; }
+    .control-header { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+    label { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; opacity: .55; }
+    output { font: 10px monospace; opacity: .72; }
+    .control input[type="range"] { width: 100%; }
+    input[type="text"], input[type="number"], select { width: 100%; padding: 6px 8px; font-size: 11px; }
+    input[type="number"].range-number { width: 72px; margin-top: 5px; padding: 5px 6px; font: 10px monospace; }
+    input[type="color"] { width: 42px; height: 28px; padding: 0; border: 1px solid var(--border-strong); background: transparent; }
+    .material-colors { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 7px; align-items: center; }
+    .texture-canvas-wrap { margin-top: 8px; aspect-ratio: 1; border: 1px solid var(--border); background: #111; }
+    #texture-painter { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; image-rendering: pixelated; }
+    .empty-state { padding: 10px; border: 1px dashed var(--border); color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .check-row { display:flex; align-items:center; gap:8px; margin-top:9px; }
+    .check-row input { accent-color: var(--accent); }
+    .section-note { margin-top:8px; font-size:10px; line-height:1.45; color:var(--muted); }
+    .hidden { display: none !important; }
+    @media (max-width: 1050px) {
+      body { grid-template-columns: 250px minmax(320px, 1fr) 270px; }
+    }
+  </style>
+</head>
+<body>
+  <aside class="panel panel-left" aria-label="World assets">
+    <section class="panel-section">
+      <h1>World Builder</h1>
+      <p class="subtle" style="margin-top:7px">Combine Equation Lab surfaces, sculpted reliefs, and primitives into one saved scene.</p>
+    </section>
+
+    <section class="panel-section">
+      <h2>Add geometry</h2>
+      <div class="row wrap">
+        <button type="button" data-add-primitive="cube">Cube</button>
+        <button type="button" data-add-primitive="sphere">Sphere</button>
+        <button type="button" data-add-primitive="torus">Torus</button>
+        <button type="button" data-add-primitive="plane">Plane</button>
+      </div>
+      <div class="row">
+        <button type="button" id="import-asset" class="primary-button">Import asset JSON</button>
+      </div>
+      <input id="asset-file" type="file" accept=".json,application/json" multiple hidden>
+    </section>
+
+    <section class="panel-section">
+      <div class="row" style="margin-top:0; justify-content:space-between">
+        <h2 style="margin:0">Scene objects</h2>
+        <span id="object-count" class="subtle">0</span>
+      </div>
+      <div id="object-list" class="object-list"></div>
+    </section>
+
+
+    <section class="panel-section">
+      <h2>Render / environment</h2>
+      <div class="material-colors"><label for="render-background">Background</label><input id="render-background" type="color" value="#080b09"><span></span><span></span></div>
+      <div class="control"><div class="control-header"><label for="render-exposure">Exposure</label><output id="render-exposure-value">1.08</output></div><input id="render-exposure" type="range" min="0.35" max="2.5" step="0.01" value="1.08"></div>
+      <div class="control"><div class="control-header"><label for="render-ambient">Ambient</label><output id="render-ambient-value">0.34</output></div><input id="render-ambient" type="range" min="0" max="1.5" step="0.01" value="0.34"></div>
+      <div class="control"><div class="control-header"><label for="render-light-intensity">Key light</label><output id="render-light-intensity-value">1.15</output></div><input id="render-light-intensity" type="range" min="0" max="3" step="0.01" value="1.15"></div>
+      <div class="control"><div class="control-header"><label for="render-light-azimuth">Light azimuth</label><output id="render-light-azimuth-value">-42</output></div><input id="render-light-azimuth" type="range" min="-180" max="180" step="1" value="-42"></div>
+      <div class="control"><div class="control-header"><label for="render-light-elevation">Light elevation</label><output id="render-light-elevation-value">55</output></div><input id="render-light-elevation" type="range" min="-10" max="90" step="1" value="55"></div>
+      <div class="control"><div class="control-header"><label for="render-rim">Rim light</label><output id="render-rim-value">0.18</output></div><input id="render-rim" type="range" min="0" max="1" step="0.01" value="0.18"></div>
+      <div class="check-row"><input id="render-grid" type="checkbox" checked><label for="render-grid">Placement mesh</label></div>
+      <div class="row"><button id="reset-render" type="button">Reset lighting</button></div>
+    </section>
+
+    <section class="panel-section">
+      <h2>World file</h2>
+      <div class="row wrap">
+        <button type="button" id="save-world">Export</button>
+        <button type="button" id="load-world">Import</button>
+        <button type="button" id="new-world" class="danger-button">New</button>
+      </div>
+      <div class="row">
+        <button type="button" id="animate-world" class="primary-button">Animate scene</button>
+      </div>
+      <input id="world-file" type="file" accept=".json,application/json" hidden>
+      <p class="subtle" style="margin-top:8px">The current scene is also auto-saved in this browser.</p>
+    </section>
+  </aside>
+
+  <main id="stage">
+    <canvas id="world-view" aria-label="3D world preview"></canvas>
+    <div class="stage-toolbar">
+      <div class="stage-actions">
+        <button id="reset-camera" type="button">Reset view</button>
+        <button id="toggle-free-camera" type="button">Free cam: off</button>
+        <button id="toggle-placement-mesh" type="button">Placement mesh: on</button>
+        <button id="toggle-wireframe" type="button">Wireframe: on</button>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center"><span id="render-backend" class="render-badge">WebGL2</span><a id="back" href="index.html">&lt;- Studio</a></div>
+    </div>
+    <div id="stage-hint" class="stage-hint">Drag to orbit - Ctrl/right-drag to pan - Scroll to zoom</div>
+  </main>
+
+  <aside class="panel panel-right" aria-label="Object inspector">
+    <div id="no-selection" class="panel-section">
+      <div class="empty-state">Select an object to edit its transform and material.</div>
+    </div>
+
+    <div id="inspector" class="hidden">
+      <section class="panel-section">
+        <h2>Selected object</h2>
+        <input id="object-name" type="text" maxlength="80" aria-label="Object name">
+        <div class="row wrap">
+          <button id="duplicate-object" type="button">Duplicate</button>
+          <button id="edit-materials" type="button" class="primary-button">Sculpt / materials</button>
+          <button id="delete-object" type="button" class="danger-button">Delete</button>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <h2>Transform</h2>
+        <div id="transform-controls"></div>
+      </section>
+
+      <section class="panel-section">
+        <h2>Material</h2>
+        <label for="texture-type">Texture</label>
+        <select id="texture-type">
+          <option value="solid">Solid</option>
+          <option value="checker">Checker</option>
+          <option value="stripes">Stripes</option>
+          <option value="contour">Height contours</option>
+          <option value="noise">Noise</option>
+          <option value="image">Painted / image</option>
+        </select>
+        <div class="material-colors" style="margin-top:9px">
+          <label for="primary-color">Primary</label><input id="primary-color" type="color" value="#50d08a">
+          <label for="secondary-color">Secondary</label><input id="secondary-color" type="color" value="#173b24">
+        </div>
+        <div class="control">
+          <div class="control-header"><label for="texture-scale">Texture scale</label><output id="texture-scale-value">6</output></div>
+          <input id="texture-scale" type="range" min="1" max="30" step="1" value="6">
+        </div>
+        <div class="control">
+          <div class="control-header"><label for="roughness">Roughness</label><output id="roughness-value">0.55</output></div>
+          <input id="roughness" type="range" min="0" max="1" step="0.05" value="0.55">
+        </div>
+        <div class="row">
+          <button id="upload-texture" type="button">Upload image</button>
+        </div>
+        <input id="texture-file" type="file" accept="image/*" hidden>
+      </section>
+
+      <section class="panel-section">
+        <h2>Texture painter</h2>
+        <label for="pattern-kind">Generate pattern</label>
+        <select id="pattern-kind">
+          <option value="marble">Marble</option>
+          <option value="clouds">Clouds</option>
+          <option value="patina">Patina</option>
+          <option value="speckle">Speckle</option>
+          <option value="rings">Growth rings</option>
+          <option value="weave">Woven fibers</option>
+          <option value="tiles">Stone tiles</option>
+          <option value="cellular">Cellular</option>
+          <option value="topographic">Topographic</option>
+          <option value="cracks">Cracked paint</option>
+          <option value="brushed">Brushed metal</option>
+        </select>
+        <div class="control">
+          <div class="control-header"><label for="pattern-scale">Pattern scale</label><output id="pattern-scale-value">9</output></div>
+          <input id="pattern-scale" type="range" min="2" max="40" step="1" value="9">
+        </div>
+        <div class="control">
+          <div class="control-header"><label for="pattern-detail">Pattern detail</label><output id="pattern-detail-value">0.60</output></div>
+          <input id="pattern-detail" type="range" min="0" max="1" step="0.01" value="0.60">
+        </div>
+        <div class="control">
+          <div class="control-header"><label for="pattern-contrast">Pattern contrast</label><output id="pattern-contrast-value">0.70</output></div>
+          <input id="pattern-contrast" type="range" min="0" max="1" step="0.01" value="0.70">
+        </div>
+        <div class="row" style="margin-top:0">
+          <label for="paint-color">Brush</label><input id="paint-color" type="color" value="#63d98f">
+          <label for="paint-size">Size</label><input id="paint-size" type="range" min="2" max="60" value="18">
+        </div>
+        <div class="texture-canvas-wrap"><canvas id="texture-painter" width="256" height="256"></canvas></div>
+        <div class="row wrap">
+          <button id="clear-texture" type="button">Clear</button>
+          <button id="random-texture" type="button">Generate</button>
+          <button id="apply-texture" type="button" class="primary-button">Apply now</button>
+        </div>
+        <div class="row">
+          <button id="surface-paint-toggle" type="button">Paint on object: off</button>
+        </div>
+        <p class="section-note">Painting in this square now updates the selected object automatically. Turn on <strong>Paint on object</strong> to brush directly over a sphere or another UV-mapped mesh.</p>
+      </section>
+
+      <section class="panel-section">
+        <h2>Surface relief</h2>
+        <div class="check-row">
+          <input id="relief-enabled" type="checkbox">
+          <label for="relief-enabled">Enable displacement</label>
+        </div>
+        <div class="control">
+          <div class="control-header"><label for="relief-strength">Relief amount</label><output id="relief-strength-value">0.25</output></div>
+          <input id="relief-strength" type="range" min="0" max="0.8" step="0.01" value="0.25">
+        </div>
+        <div class="control">
+          <div class="control-header"><label for="relief-midpoint">Neutral brightness</label><output id="relief-midpoint-value">0.50</output></div>
+          <input id="relief-midpoint" type="range" min="0" max="1" step="0.01" value="0.50">
+        </div>
+        <div class="row wrap">
+          <button id="paint-to-relief" type="button">Use paint as relief</button>
+          <button id="import-relief" type="button">Import relief JSON</button>
+          <button id="clear-relief" type="button">Remove</button>
+        </div>
+        <input id="relief-file" type="file" accept=".json,application/json" hidden>
+        <p id="relief-source" class="section-note">No relief map. Bright pixels push outward; dark pixels move inward when the neutral level is above zero.</p>
+      </section>
+    </div>
+  </aside>
+
+  <div id="toast" class="status-toast" role="status" aria-live="polite"></div>
+  <script src="studio-core.js"></script>
+  <script src="studio-procedural.js"></script>
+  <script src="studio-webgl.js"></script>
+  <script src="world.js"></script>
+</body>
+</html>

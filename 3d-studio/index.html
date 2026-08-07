@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+  <title>3D Studio</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #080a0a;
+      --panel: #101414;
+      --panel-strong: #151b1b;
+      --line: #273332;
+      --text: #e8f5ed;
+      --muted: #7f918c;
+      --green: #8df7a6;
+      --cyan: #74d8ff;
+      --amber: #ffc46b;
+      --rose: #ff8aa3;
+      --violet: #b9a3ff;
+      --lime: #c9f56f;
+    }
+    body {
+      background:
+        linear-gradient(180deg, #0d1111 0%, var(--bg) 52%, #060707 100%);
+      color: var(--text);
+      font-family: "Gill Sans", "Trebuchet MS", sans-serif;
+      min-height: 100vh;
+      padding: clamp(20px, 4vw, 56px);
+    }
+    .shell {
+      width: min(1120px, 100%);
+      min-height: calc(100vh - clamp(20px, 4vw, 56px) * 2);
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: clamp(28px, 5vh, 56px);
+    }
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 22px;
+    }
+    .header-copy {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 16px;
+    }
+    h1 {
+      font-size: clamp(2.2rem, 6vw, 5.2rem);
+      line-height: 0.9;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+    .tagline {
+      max-width: 340px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.55;
+      text-align: right;
+    }
+    .coffee {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 16px;
+      border: 1px solid var(--amber);
+      background: #21180b;
+      color: #ffd99b;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+    .coffee:hover,
+    .coffee:focus-visible {
+      background: #33230d;
+      border-color: #ffd99b;
+      color: #ffffff;
+      outline: none;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(210px, 1fr));
+      gap: 18px;
+    }
+    .card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 24px;
+      min-height: 184px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      background: color-mix(in srgb, var(--panel) 94%, var(--accent, var(--green)));
+      text-decoration: none;
+      color: var(--text);
+      outline: none;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+    .card::before {
+      content: "";
+      width: 42px;
+      height: 3px;
+      background: var(--accent, var(--green));
+    }
+    .card:hover,
+    .card:focus-visible {
+      transform: translateY(-3px);
+      background: var(--panel-strong);
+      border-color: var(--accent, var(--green));
+      border-color: color-mix(in srgb, var(--accent, var(--green)) 60%, white);
+    }
+    .card:nth-child(1) { --accent: var(--green); }
+    .card:nth-child(2) { --accent: var(--cyan); }
+    .card:nth-child(3) { --accent: var(--amber); }
+    .card:nth-child(4) { --accent: var(--rose); }
+    .card:nth-child(5) { --accent: var(--violet); }
+    .card:nth-child(6) { --accent: var(--lime); }
+    .card h2 {
+      font-size: clamp(0.95rem, 1.3vw, 1.08rem);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #ffffff;
+    }
+    .card p  {
+      margin-top: 12px;
+      font-size: 0.86rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .card span {
+      color: var(--accent, var(--green));
+      font-size: 0.76rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    @media (max-width: 860px) {
+      .shell { justify-content: flex-start; }
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .header-copy { align-items: flex-start; }
+      .tagline {
+        max-width: 520px;
+        text-align: left;
+      }
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 580px) {
+      body { padding: 18px; }
+      .cards { grid-template-columns: 1fr; }
+      .card { min-height: 148px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <h1>3D Studio</h1>
+      <div class="header-copy">
+        <p class="tagline">Build, sculpt, preview, and animate procedural 3D scenes from one workspace.</p>
+        <a class="coffee" href="https://buymeacoffee.com/creatioexnihilo" target="_blank" rel="noopener noreferrer">Buy me a coffee</a>
+      </div>
+    </header>
+    <div class="cards">
+      <a class="card" href="viewer.html">
+        <div>
+          <h2>3D Viewer</h2>
+          <p>Explore parametric shapes with drag-to-rotate camera controls and zoom.</p>
+        </div>
+        <span>Open Viewer</span>
+      </a>
+      <a class="card" href="sculptor.html">
+        <div>
+          <h2>Relief Sculptor</h2>
+          <p>Paint a heightmap and preview the result live as a 3D surface.</p>
+        </div>
+        <span>Open Sculptor</span>
+      </a>
+      <a class="card" href="equation.html">
+        <div>
+          <h2>Equation Lab</h2>
+          <p>Define surfaces, inspect equations, and experiment with 3D fractals.</p>
+        </div>
+        <span>Open Lab</span>
+      </a>
+      <a class="card" href="world.html">
+        <div>
+          <h2>World Builder</h2>
+          <p>Combine generated shapes, place objects, and design world textures.</p>
+        </div>
+        <span>Open Builder</span>
+      </a>
+      <a class="card" href="materials.html">
+        <div>
+          <h2>Sculpt Materials</h2>
+          <p>Sculpt complex meshes, layer artistic materials, and export assets.</p>
+        </div>
+        <span>Open Materials</span>
+      </a>
+      <a class="card" href="scene.html">
+        <div>
+          <h2>Scene Animator</h2>
+          <p>Animate objects and worlds with keyframes, stacked motion, GIF, and video export.</p>
+        </div>
+        <span>Open Animator</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

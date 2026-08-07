@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+  <title>3D Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0b0b0b; overflow: hidden; }
+    canvas { display: block; cursor: grab; touch-action: none; }
+    canvas.dragging { cursor: grabbing; }
+    #ui { position: fixed; top: 16px; left: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: calc(100vw - 120px); }
+    select, button {
+      background: #0f1f0f; color: #d6fcd6; border: 1px solid #2a4a2a;
+      font-family: inherit; cursor: pointer; outline: none; padding: 6px 10px;
+    }
+    select { font-size: 13px; letter-spacing: .04em; }
+    button { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+    button:hover { background: #1a2a1a; }
+    .hint { position: fixed; bottom: 16px; right: 16px; color: #d6fcd6; opacity: .25; font-family: "Gill Sans", "Trebuchet MS", sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; user-select: none; }
+    #status { position: fixed; left: 16px; bottom: 16px; color: #d6fcd6; opacity: .45; font: 10px "Gill Sans", sans-serif; }
+    #back { position: fixed; top: 16px; right: 16px; color: #d6fcd6; opacity: .3; text-decoration: none; font-family: "Gill Sans", "Trebuchet MS", sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+    #back:hover { opacity: .75; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <input type="file" id="import-file" accept=".json,application/json" hidden>
+  <div id="ui">
+    <select id="shape-sel">
+      <option value="torus">Torus</option>
+      <option value="sphere">Sphere</option>
+      <option value="cube">Cube</option>
+      <option value="knot">Torus Knot (2,3)</option>
+      <option value="menger">Fractal - Menger Sponge</option>
+      <option value="sierpinski">Fractal - Sierpinski Tetrahedron</option>
+      <option value="mandelbulb">Fractal - Mandelbulb</option>
+    </select>
+    <button id="btn-import" type="button">Import JSON</button>
+    <button id="btn-export" type="button">Export JSON</button>
+    <button id="btn-world" type="button">Add to World</button>
+  </div>
+  <div id="status"></div>
+  <div class="hint">Drag to rotate - Scroll to zoom</div>
+  <a id="back" href="index.html">&lt;- Back</a>
+
+  <script src="studio-core.js"></script>
+  <script src="studio-webgl.js"></script>
+  <script>
+    'use strict';
+    const canvas = document.getElementById('c');
+    const renderer = window.StudioWebGL?.createRenderer(canvas, { onInvalidate: () => render() });
+    const context = renderer?.available ? null : canvas.getContext('2d');
+    const status = document.getElementById('status');
+
+    let angleX = 0.4;
+    let angleY = 0.5;
+    let zoom = 2.7;
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let currentAsset = null;
+    let displayShape = { verts: [], edges: [] };
+
+    const rotateX = ({ x, y, z }, angle) => ({ x, y: y*Math.cos(angle)-z*Math.sin(angle), z: y*Math.sin(angle)+z*Math.cos(angle) });
+    const rotateY = ({ x, y, z }, angle) => ({ x: x*Math.cos(angle)+z*Math.sin(angle), y, z: -x*Math.sin(angle)+z*Math.cos(angle) });
+
+    function resize() {
+      const dpr=Math.min(2,devicePixelRatio||1); canvas.width = Math.round(innerWidth*dpr); canvas.height = Math.round(innerHeight*dpr); canvas.style.width=innerWidth+'px'; canvas.style.height=innerHeight+'px';
+      render();
+    }
+
+    function project(vertex) {
+      const depth = vertex.z + zoom;
+      if (depth < 0.01) return null;
+      const focalLength = canvas.height * 0.48;
+      return {
+        x: canvas.width/2 + vertex.x*focalLength/depth,
+        y: canvas.height/2 - vertex.y*focalLength/depth
+      };
+    }
+
+    function render() {
+      if (renderer?.available && currentAsset) {
+        renderer.render([{ id:'viewer-object', asset:currentAsset, transform:{ position:{x:0,y:0,z:0}, rotation:{x:0,y:0,z:0}, scale:{x:1,y:1,z:1} }, material:currentAsset.metadata?.material || { type:'checker', primary:'#50d08a', secondary:'#173b24', scale:7, roughness:.55 } }], { pitch:angleX, yaw:angleY, distance:zoom, targetY:0 }, { background:'#080b09', grid:true, wireframe:true, exposure:1.08, ambient:.34, lightIntensity:1.15, rim:.18 });
+        return;
+      }
+      if (!context) return;
+      context.fillStyle = '#0b0b0b';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      const points = displayShape.verts.map((vertex) => project(rotateY(rotateX(vertex, angleX), angleY)));
+      context.beginPath(); context.strokeStyle = '#50d08a'; context.lineWidth = 1;
+      for (const [start, end] of displayShape.edges) { const a = points[start], b = points[end]; if (!a || !b) continue; context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); }
+      context.stroke();
+    }
+
+    function showAsset(asset) {
+      currentAsset = StudioCore.standardiseAsset(asset);
+      displayShape = {
+        verts: currentAsset.vertices.map(([x,y,z]) => ({ x, y, z })),
+        edges: StudioCore.facesToEdges(currentAsset.faces)
+      };
+      status.textContent = `${currentAsset.name} - ${currentAsset.vertices.length} vertices - ${currentAsset.faces.length} triangles`;
+      render();
+    }
+
+    function createGridAsset(name, type, rows, cols, vertexFactory, metadata = {}) {
+      const vertices = [];
+      for (let row=0; row<rows; row++) for (let col=0; col<cols; col++) vertices.push(vertexFactory(row,col,rows,cols));
+      return StudioCore.standardiseAsset({
+        name, type, rows, cols, vertices,
+        faces: StudioCore.gridFaces(rows, cols),
+        uvs: StudioCore.gridUvs(rows, cols),
+        metadata
+      });
+    }
+
+    function createSphere() {
+      const rows=25, cols=37;
+      return createGridAsset('Sphere','primitive-sphere',rows,cols,(row,col)=>{
+        const v=row/(rows-1), u=col/(cols-1), theta=v*Math.PI, phi=u*Math.PI*2;
+        return [Math.sin(theta)*Math.cos(phi), Math.cos(theta), Math.sin(theta)*Math.sin(phi)];
+      });
+    }
+
+    function createTorus() {
+      const rows=29, cols=41, major=.7, minor=.3;
+      return createGridAsset('Torus','primitive-torus',rows,cols,(row,col)=>{
+        const v=row/(rows-1)*Math.PI*2, u=col/(cols-1)*Math.PI*2;
+        return [(major+minor*Math.cos(v))*Math.cos(u), minor*Math.sin(v), (major+minor*Math.cos(v))*Math.sin(u)];
+      });
+    }
+
+    function createCube() {
+      const size=.8;
+      return StudioCore.standardiseAsset({
+        name:'Cube', type:'primitive-cube',
+        vertices:[[-size,-size,-size],[size,-size,-size],[size,size,-size],[-size,size,-size],[-size,-size,size],[size,-size,size],[size,size,size],[-size,size,size]],
+        faces:[[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[3,7,6],[3,6,2],[1,2,6],[1,6,5],[0,4,7],[0,7,3]],
+        uvs:[[0,0],[1,0],[1,1],[0,1],[0,0],[1,0],[1,1],[0,1]]
+      });
+    }
+
+    function createKnot(p=2, q=3, segments=150, radialSegments=10, tubeRadius=.075) {
+      const centers=[];
+      const pointAt=(index)=>{
+        const t=(index/segments)*Math.PI*2;
+        const radius=Math.cos(q*t)+2;
+        return { x:radius*Math.cos(p*t)/3, y:radius*Math.sin(p*t)/3, z:Math.sin(q*t)/3 };
+      };
+      for(let index=0;index<segments;index++) centers.push(pointAt(index));
+      const vertices=[], uvs=[], faces=[];
+      for(let index=0;index<segments;index++) {
+        const previous=centers[(index-1+segments)%segments];
+        const next=centers[(index+1)%segments];
+        const tangent={x:next.x-previous.x,y:next.y-previous.y,z:next.z-previous.z};
+        const tangentLength=Math.hypot(tangent.x,tangent.y,tangent.z)||1;
+        tangent.x/=tangentLength; tangent.y/=tangentLength; tangent.z/=tangentLength;
+        const reference=Math.abs(tangent.y)<.9?{x:0,y:1,z:0}:{x:1,y:0,z:0};
+        let normal={x:tangent.y*reference.z-tangent.z*reference.y,y:tangent.z*reference.x-tangent.x*reference.z,z:tangent.x*reference.y-tangent.y*reference.x};
+        const normalLength=Math.hypot(normal.x,normal.y,normal.z)||1;
+        normal={x:normal.x/normalLength,y:normal.y/normalLength,z:normal.z/normalLength};
+        const binormal={x:tangent.y*normal.z-tangent.z*normal.y,y:tangent.z*normal.x-tangent.x*normal.z,z:tangent.x*normal.y-tangent.y*normal.x};
+        for(let radial=0;radial<radialSegments;radial++) {
+          const angle=radial/radialSegments*Math.PI*2;
+          const cosine=Math.cos(angle), sine=Math.sin(angle), center=centers[index];
+          vertices.push([center.x+tubeRadius*(normal.x*cosine+binormal.x*sine),center.y+tubeRadius*(normal.y*cosine+binormal.y*sine),center.z+tubeRadius*(normal.z*cosine+binormal.z*sine)]);
+          uvs.push([index/segments,radial/radialSegments]);
+        }
+      }
+      for(let index=0;index<segments;index++) for(let radial=0;radial<radialSegments;radial++) {
+        const nextIndex=(index+1)%segments, nextRadial=(radial+1)%radialSegments;
+        const a=index*radialSegments+radial, b=nextIndex*radialSegments+radial, c=nextIndex*radialSegments+nextRadial, d=index*radialSegments+nextRadial;
+        faces.push([a,b,c],[a,c,d]);
+      }
+      return StudioCore.standardiseAsset({name:'Torus Knot (2,3)',type:'primitive-knot',vertices,faces,uvs});
+    }
+
+    function addFace(vertices, faces, uvs, corners) {
+      const offset = vertices.length;
+      corners.forEach((corner, index) => {
+        vertices.push(corner);
+        uvs.push([[0,0],[1,0],[1,1],[0,1]][index]);
+      });
+      faces.push([offset, offset + 1, offset + 2], [offset, offset + 2, offset + 3]);
+    }
+
+    function createMengerSponge(level = 3) {
+      const count = 3 ** level;
+      const step = 2 / count;
+      const filled = new Set();
+      const key = (x, y, z) => `${x},${y},${z}`;
+      const keepCell = (x, y, z) => {
+        for (let scale = 1; scale < count; scale *= 3) {
+          const middleAxes = [x, y, z].filter((value) => Math.floor(value / scale) % 3 === 1).length;
+          if (middleAxes >= 2) return false;
+        }
+        return true;
+      };
+
+      for (let x = 0; x < count; x += 1) {
+        for (let y = 0; y < count; y += 1) {
+          for (let z = 0; z < count; z += 1) {
+            if (keepCell(x, y, z)) filled.add(key(x, y, z));
+          }
+        }
+      }
+
+      const vertices = [], faces = [], uvs = [];
+      const has = (x, y, z) => filled.has(key(x, y, z));
+      const bounds = (x, y, z) => {
+        const x0 = -1 + x * step, x1 = x0 + step;
+        const y0 = -1 + y * step, y1 = y0 + step;
+        const z0 = -1 + z * step, z1 = z0 + step;
+        return { x0, x1, y0, y1, z0, z1 };
+      };
+
+      for (const cell of filled) {
+        const [x, y, z] = cell.split(',').map(Number);
+        const { x0, x1, y0, y1, z0, z1 } = bounds(x, y, z);
+        if (!has(x + 1, y, z)) addFace(vertices, faces, uvs, [[x1,y0,z0],[x1,y1,z0],[x1,y1,z1],[x1,y0,z1]]);
+        if (!has(x - 1, y, z)) addFace(vertices, faces, uvs, [[x0,y0,z0],[x0,y0,z1],[x0,y1,z1],[x0,y1,z0]]);
+        if (!has(x, y + 1, z)) addFace(vertices, faces, uvs, [[x0,y1,z0],[x0,y1,z1],[x1,y1,z1],[x1,y1,z0]]);
+        if (!has(x, y - 1, z)) addFace(vertices, faces, uvs, [[x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1]]);
+        if (!has(x, y, z + 1)) addFace(vertices, faces, uvs, [[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]]);
+        if (!has(x, y, z - 1)) addFace(vertices, faces, uvs, [[x0,y0,z0],[x0,y1,z0],[x1,y1,z0],[x1,y0,z0]]);
+      }
+
+      return StudioCore.standardiseAsset({
+        name: 'Menger Sponge',
+        type: 'fractal-menger',
+        vertices,
+        faces,
+        uvs,
+        metadata: {
+          material: { type:'checker', primary:'#62d98d', secondary:'#102314', scale:18, roughness:.72 },
+          fractal: { kind:'menger', level }
+        }
+      });
+    }
+
+    function createSierpinskiTetrahedron(level = 5) {
+      const source = [
+        [1, 1, 1],
+        [-1, -1, 1],
+        [-1, 1, -1],
+        [1, -1, -1]
+      ].map(([x, y, z]) => [x / Math.sqrt(3), y / Math.sqrt(3), z / Math.sqrt(3)]);
+      const midpoint = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+      let tetrahedra = [source];
+
+      for (let depth = 0; depth < level; depth += 1) {
+        const next = [];
+        for (const [a, b, c, d] of tetrahedra) {
+          const ab = midpoint(a, b), ac = midpoint(a, c), ad = midpoint(a, d);
+          const bc = midpoint(b, c), bd = midpoint(b, d), cd = midpoint(c, d);
+          next.push([a, ab, ac, ad], [ab, b, bc, bd], [ac, bc, c, cd], [ad, bd, cd, d]);
+        }
+        tetrahedra = next;
+      }
+
+      const vertices = [], faces = [], uvs = [];
+      const addTri = (a, b, c) => {
+        const offset = vertices.length;
+        vertices.push(a, b, c);
+        uvs.push([0,0], [1,0], [0.5,1]);
+        faces.push([offset, offset + 1, offset + 2]);
+      };
+      for (const [a, b, c, d] of tetrahedra) {
+        addTri(a, c, b);
+        addTri(a, b, d);
+        addTri(a, d, c);
+        addTri(b, c, d);
+      }
+
+      return StudioCore.standardiseAsset({
+        name: 'Sierpinski Tetrahedron',
+        type: 'fractal-sierpinski',
+        vertices,
+        faces,
+        uvs,
+        metadata: {
+          material: { type:'matte', primary:'#7de6b1', secondary:'#173b24', scale:10, roughness:.68 },
+          fractal: { kind:'sierpinski-tetrahedron', level }
+        }
+      });
+    }
+
+    function mandelbulbInside(point, power = 8, iterations = 12) {
+      let x = 0, y = 0, z = 0;
+      for (let index = 0; index < iterations; index += 1) {
+        const radius = Math.hypot(x, y, z);
+        if (radius > 2) return false;
+        const theta = radius > 0 ? Math.acos(z / radius) : 0;
+        const phi = Math.atan2(y, x);
+        const raised = radius ** power;
+        const sinTheta = Math.sin(theta * power);
+        x = raised * sinTheta * Math.cos(phi * power) + point[0];
+        y = raised * sinTheta * Math.sin(phi * power) + point[1];
+        z = raised * Math.cos(theta * power) + point[2];
+      }
+      return true;
+    }
+
+    function createMandelbulb() {
+      const rows = 45, cols = 73;
+      const maxRadius = 1.45;
+      return createGridAsset('Mandelbulb', 'fractal-mandelbulb', rows, cols, (row, col) => {
+        const theta = row / (rows - 1) * Math.PI;
+        const phi = col / (cols - 1) * Math.PI * 2;
+        const dir = [Math.sin(theta) * Math.cos(phi), Math.cos(theta), Math.sin(theta) * Math.sin(phi)];
+        let low = 0, high = maxRadius;
+        for (let stepIndex = 0; stepIndex < 12; stepIndex += 1) {
+          const mid = (low + high) / 2;
+          if (mandelbulbInside([dir[0] * mid, dir[1] * mid, dir[2] * mid])) low = mid;
+          else high = mid;
+        }
+        const radius = Math.max(0.08, low);
+        return [dir[0] * radius, dir[1] * radius, dir[2] * radius];
+      }, {
+        material: { type:'contour', primary:'#72dca2', secondary:'#183421', scale:14, roughness:.62 },
+        fractal: { kind:'mandelbulb', power:8, iterations:12 }
+      });
+    }
+
+    const factories={
+      torus:createTorus,
+      sphere:createSphere,
+      cube:createCube,
+      knot:createKnot,
+      menger:createMengerSponge,
+      sierpinski:createSierpinskiTetrahedron,
+      mandelbulb:createMandelbulb
+    };
+
+    canvas.addEventListener('pointerdown', (event) => {
+      dragging=true; lastX=event.clientX; lastY=event.clientY;
+      canvas.setPointerCapture(event.pointerId); canvas.classList.add('dragging');
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if(!dragging) return;
+      angleY+=(event.clientX-lastX)*.008; angleX+=(event.clientY-lastY)*.008;
+      lastX=event.clientX; lastY=event.clientY; render();
+    });
+    canvas.addEventListener('pointerup', () => { dragging=false; canvas.classList.remove('dragging'); });
+    canvas.addEventListener('pointercancel', () => { dragging=false; canvas.classList.remove('dragging'); });
+    canvas.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      zoom=Math.max(1.2,Math.min(12,zoom+event.deltaY*.004)); render();
+    }, {passive:false});
+
+    document.getElementById('shape-sel').addEventListener('change', (event) => showAsset((factories[event.target.value]||createTorus)()));
+    document.getElementById('btn-import').addEventListener('click', () => document.getElementById('import-file').click());
+    document.getElementById('import-file').addEventListener('change', async (event) => {
+      const file=event.target.files[0];
+      if(!file) return;
+      try { showAsset(StudioCore.standardiseAsset(JSON.parse(await file.text()), {name:file.name.replace(/\.json$/i,''), normalise:true})); }
+      catch(error) { status.textContent=error.message; }
+      event.target.value='';
+    });
+    document.getElementById('btn-export').addEventListener('click', () => currentAsset && StudioCore.downloadJson('viewer-shape.json', currentAsset));
+    document.getElementById('btn-world').addEventListener('click', () => {
+      if(!currentAsset) return;
+      try {
+        StudioCore.queueAsset(currentAsset);
+        location.href='world.html';
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    });
+
+    window.addEventListener('resize', resize);
+    showAsset(createTorus());
+    resize();
+  </script>
+</body>
+</html>
