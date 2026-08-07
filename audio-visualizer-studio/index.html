@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audio Visualizer Studio</title>
+  <meta name="description" content="Fast audio visualizer for MP3, WAV and OGG with selectable skins and silent MP4, GIF and PNG export.">
+  <script defer src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050610;
+      --panel: #0d1020;
+      --panel-2: #12162a;
+      --line: rgba(255,255,255,.1);
+      --text: #f5f7ff;
+      --muted: #9ca6c5;
+      --accent: #67f4ff;
+      --accent-2: #916eff;
+      --danger: #ff6680;
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #050610; color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { padding: 18px; background: radial-gradient(circle at 20% 0%, #111738 0, transparent 34%), #050610; }
+    button, input, select { font: inherit; }
+    .app { width: min(1500px, 100%); margin: 0 auto; display: grid; gap: 16px; }
+    .topbar, .stage, .card { border: 1px solid var(--line); background: rgba(13,16,32,.96); border-radius: var(--radius); box-shadow: 0 18px 55px rgba(0,0,0,.3); }
+    .topbar { padding: 17px 20px; display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+    h1 { margin: 0; font-size: clamp(1.35rem, 2vw, 2rem); letter-spacing: -.04em; }
+    .subtitle { margin: 5px 0 0; color: var(--muted); font-size: .9rem; }
+    .performance { color: #b8ffd9; border: 1px solid rgba(87,232,160,.25); background: rgba(87,232,160,.08); border-radius: 999px; padding: 8px 11px; white-space: nowrap; font-size: .8rem; }
+    .workspace { display: grid; grid-template-columns: minmax(0,1fr) 350px; gap: 16px; align-items: start; }
+    .stage { overflow: hidden; }
+    .stage-head { min-height: 58px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
+    .file-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .filename { color: var(--muted); max-width: min(38vw, 430px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .85rem; }
+    .meta { color: var(--muted); font-size: .78rem; white-space: nowrap; }
+    .button, .file-button { min-height: 40px; border: 1px solid rgba(255,255,255,.13); color: var(--text); background: #171b31; border-radius: 11px; padding: 9px 12px; cursor: pointer; transition: transform .14s ease, border-color .14s ease, background .14s ease; }
+    .button:hover:not(:disabled), .file-button:hover { transform: translateY(-1px); border-color: rgba(103,244,255,.42); background: #1b2540; }
+    .button.primary { background: linear-gradient(135deg, rgba(103,244,255,.2), rgba(145,110,255,.22)); border-color: rgba(103,244,255,.35); }
+    .button.danger { border-color: rgba(255,102,128,.3); color: #ffd5dc; }
+    .button:disabled { opacity: .42; cursor: not-allowed; transform: none; }
+    .canvas-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #02030a; contain: layout paint size; transition: width .2s ease, aspect-ratio .2s ease; }
+    .canvas-wrap.phone { width: min(100%, 480px); margin-inline: auto; aspect-ratio: 9 / 16; }
+    .canvas-wrap.square { width: min(100%, 720px); margin-inline: auto; aspect-ratio: 1 / 1; }
+    canvas { display: block; width: 100%; height: 100%; background: #02030a; }
+    .empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 30px; text-align: center; pointer-events: none; }
+    .empty.hidden { display: none; }
+    .empty div { max-width: 470px; border: 1px solid rgba(255,255,255,.1); background: rgba(5,7,17,.82); border-radius: 16px; padding: 22px; }
+    .empty strong { display: block; margin-bottom: 8px; }
+    .empty span { color: var(--muted); line-height: 1.5; font-size: .9rem; }
+    .drop { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(7,10,24,.9); opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+    .canvas-wrap.dragging .drop { opacity: 1; }
+    .transport { padding: 13px 14px; display: grid; gap: 10px; border-top: 1px solid var(--line); }
+    audio { width: 100%; height: 42px; }
+    .timeline { display: grid; grid-template-columns: 74px 1fr 74px; gap: 8px; align-items: center; }
+    .time { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; text-align: center; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .controls { display: grid; gap: 13px; }
+    .card { padding: 15px; }
+    .card h2 { margin: 0 0 13px; font-size: .96rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field { display: grid; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    label { color: var(--muted); font-size: .76rem; font-weight: 650; }
+    select, input[type="number"], input[type="color"], input[type="text"] { width: 100%; min-height: 39px; border: 1px solid rgba(255,255,255,.11); border-radius: 10px; background: #171a2d; color: var(--text); padding: 0 9px; outline: none; }
+    input[type="color"] { padding: 4px; }
+    select:focus, input:focus { border-color: rgba(103,244,255,.45); }
+    .range { display: grid; grid-template-columns: 1fr 52px; gap: 7px; align-items: center; }
+    .check-row { min-height: 40px; display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.11); border-radius: 10px; background: #171a2d; color: var(--text); cursor: pointer; }
+    .check-row input { width: 17px; height: 17px; margin: 0; accent-color: var(--accent); }
+    .check-row span { font-size: .8rem; font-weight: 650; }
+    .value { color: #e6eaff; text-align: right; font-size: .76rem; font-variant-numeric: tabular-nums; }
+    .bass-meter { height: 8px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.08); }
+    .bass-meter > span { display: block; height: 100%; width: 0; transform-origin: left center; background: linear-gradient(90deg,var(--accent),var(--accent-2)); transition: width 45ms linear; }
+    .actions { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .actions .button { min-height: 44px; }
+    .note { margin: 10px 0 0; color: var(--muted); font-size: .73rem; line-height: 1.5; }
+    .progress { display: none; gap: 8px; margin-top: 11px; padding: 11px; border: 1px solid rgba(103,244,255,.18); background: rgba(103,244,255,.06); border-radius: 12px; }
+    .progress.active { display: grid; }
+    .track { height: 7px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+    .fill { height: 100%; width: 0; background: linear-gradient(90deg,var(--accent),var(--accent-2)); }
+    .progress-text { color: var(--muted); font-size: .77rem; }
+    @media (max-width: 1000px) { .workspace { grid-template-columns: 1fr; } .controls { grid-template-columns: repeat(2,minmax(0,1fr)); } .card:last-child { grid-column: 1/-1; } }
+    @media (max-width: 680px) { body { padding: 9px; } .topbar { align-items: flex-start; } .performance, .meta { display: none; } .controls { grid-template-columns: 1fr; } .card:last-child { grid-column: auto; } .grid, .actions { grid-template-columns: 1fr; } .field.full { grid-column: auto; } .filename { max-width: 42vw; } }
+  </style>
+</head>
+<body>
+<main class="app">
+  <header class="topbar">
+    <div><h1>Audio Visualizer Studio</h1><p class="subtitle">Choose one visualization skin for preview and export.</p></div>
+    <div class="performance">Adaptive preview · silent MP4</div>
+  </header>
+
+  <section class="workspace">
+    <article class="stage">
+      <div class="stage-head">
+        <div class="file-row">
+          <label class="file-button" for="audioFile">Choose audio</label>
+          <input id="audioFile" type="file" accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,.mp3,.wav,.ogg" hidden>
+          <span id="fileName" class="filename">No audio file loaded</span>
+        </div>
+        <span id="stageMeta" class="meta">Adaptive preview · silent MP4 export</span>
+      </div>
+
+      <div id="canvasWrap" class="canvas-wrap">
+        <canvas id="visualizer"></canvas>
+        <div id="empty" class="empty"><div><strong>Drop an MP3, WAV or OGG here</strong><span>Select a visualization skin. The preview stays lightweight while exports use the selected resolution.</span></div></div>
+        <div class="drop"><strong>Drop the audio file</strong></div>
+      </div>
+
+      <div class="transport">
+        <audio id="audio" controls></audio>
+        <div class="timeline"><span id="currentTime" class="time">00:00.0</span><input id="seek" type="range" min="0" max="100" step="0.01" value="0"><span id="duration" class="time">00:00.0</span></div>
+      </div>
+    </article>
+
+    <aside class="controls">
+      <section class="card">
+        <h2>Visualization</h2>
+        <div class="grid">
+          <div class="field full"><label for="visualMode">Visualization skin</label><select id="visualMode"><option value="circular" selected>Circular spectrum</option><option value="bars">Spectrum bars</option><option value="mirror">Mirrored bars</option><option value="waveform">Waveform</option><option value="plasma">Retro plasma</option><option value="tunnel">Retro tunnel</option><option value="oscilloscope">XP oscilloscope</option></select></div>
+          <div id="circularStyleField" class="field full"><label for="style">Circular style</label><select id="style"><option value="halo">Halo spectrum</option><option value="double">Double ring</option><option value="pulse">Soft pulse</option></select></div>
+          <div class="field"><label for="theme">Palette</label><select id="theme"><option value="neon">Neon</option><option value="aurora">Aurora</option><option value="sunset">Sunset</option><option value="ice">Ice</option><option value="mono">Mono</option><option value="custom">Custom</option></select></div>
+          <div class="field"><label for="customColor">Custom color</label><input id="customColor" type="color" value="#67f4ff"></div>
+          <div class="field full"><label for="bars">Detail / bar count</label><div class="range"><input id="bars" type="range" min="48" max="192" step="8" value="112"><span id="barsValue" class="value">112</span></div></div>
+          <div class="field full"><label for="sensitivity">Sensitivity</label><div class="range"><input id="sensitivity" type="range" min="0.6" max="2.6" step="0.05" value="1.35"><span id="sensitivityValue" class="value">1.35×</span></div></div>
+          <div class="field full"><label>Bass pulse</label><label class="check-row" for="bassPulse"><input id="bassPulse" type="checkbox" checked><span>Pulse the selected skin on low-frequency hits</span></label></div>
+          <div class="field full"><label for="bassBoost">Visual bass boost</label><div class="range"><input id="bassBoost" type="range" min="1" max="4" step="0.1" value="2.4"><span id="bassBoostValue" class="value">2.4×</span></div></div>
+          <div class="field full"><label for="pulseStrength">Pulse strength</label><div class="range"><input id="pulseStrength" type="range" min="0" max="1" step="0.05" value="0.65"><span id="pulseStrengthValue" class="value">65%</span></div></div>
+          <div class="field full"><label>Detected bass signal · 30–180 Hz</label><div class="bass-meter"><span id="bassMeter"></span></div></div>
+          <div class="field full"><label for="smooth">Smoothing</label><div class="range"><input id="smooth" type="range" min="0.35" max="0.92" step="0.01" value="0.72"><span id="smoothValue" class="value">72%</span></div></div>
+          <div class="field full"><label for="glow">Glow</label><div class="range"><input id="glow" type="range" min="0" max="1" step="0.05" value="0.45"><span id="glowValue" class="value">45%</span></div></div>
+          <div class="field full"><label for="previewQuality">Preview quality</label><select id="previewQuality"><option value="auto" selected>Auto · recommended</option><option value="fast">Fast</option><option value="quality">Sharp</option></select></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Text</h2>
+        <div class="grid">
+          <div class="field full"><label for="titleText">Title</label><input id="titleText" type="text" value="AUDIO REACTIVE" maxlength="42"></div>
+          <div class="field full"><label for="subtitleText">Subtitle</label><input id="subtitleText" type="text" value="SELECTED VISUALIZER" maxlength="58"></div>
+          <div class="field"><label for="centerSize">Center size</label><div class="range"><input id="centerSize" type="range" min="0.25" max="0.52" step="0.01" value="0.36"><span id="centerSizeValue" class="value">36%</span></div></div>
+          <div class="field"><label for="rotation">Rotation</label><div class="range"><input id="rotation" type="range" min="-1" max="1" step="0.05" value="0.15"><span id="rotationValue" class="value">0.15</span></div></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Export</h2>
+        <div class="grid">
+          <div class="field full"><label for="videoLayout">Frame layout</label><select id="videoLayout"><option value="desktop" selected>Desktop / YouTube · 16:9</option><option value="phone">Phone / Reels / TikTok · 9:16</option></select></div>
+          <div class="field"><label for="resolution">Video resolution</label><select id="resolution"></select></div>
+          <div class="field"><label for="fps">Video FPS</label><select id="fps"><option value="30" selected>30 FPS · stable</option><option value="45">45 FPS</option><option value="60">60 FPS · demanding</option></select></div>
+          <div class="field"><label for="videoFormat">Video container</label><select id="videoFormat"><option value="mp4" selected>MP4 · animation only</option></select></div>
+          <div class="field"><label for="bitrate">Bitrate</label><select id="bitrate"><option value="8000000">8 Mbps</option><option value="12000000" selected>12 Mbps · recommended</option><option value="20000000">20 Mbps</option><option value="30000000">30 Mbps</option></select></div>
+          <div class="field"><label for="gifResolution">GIF resolution</label><select id="gifResolution"></select></div>
+          <div class="field"><label for="gifFps">FPS GIF</label><select id="gifFps"><option value="15">15 FPS</option><option value="20" selected>20 FPS</option><option value="24">24 FPS</option></select></div>
+        </div>
+        <div class="actions">
+          <button id="exportVideo" class="button primary" disabled>Export silent MP4</button>
+          <button id="exportGif" class="button" disabled>GIF export</button>
+          <button id="savePng" class="button" disabled>Save PNG</button>
+          <button id="cancel" class="button danger" disabled>Cancel</button>
+        </div>
+        <div id="progress" class="progress"><div class="track"><div id="progressFill" class="fill"></div></div><div id="progressText" class="progress-text">Preparing…</div></div>
+        <p class="note">The exported MP4 contains animation only. The selected skin is used consistently in preview, PNG, GIF and MP4. Current Chrome or Edge is recommended.</p>
+      </section>
+    </aside>
+  </section>
+</main>
+
+<script>
+'use strict';
+
+const $ = (s) => document.querySelector(s);
+const audio = $('#audio');
+const fileInput = $('#audioFile');
+const fileName = $('#fileName');
+const canvas = $('#visualizer');
+let ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+const wrap = $('#canvasWrap');
+const empty = $('#empty');
+const seek = $('#seek');
+const currentTimeLabel = $('#currentTime');
+const durationLabel = $('#duration');
+const stageMeta = $('#stageMeta');
+const visualMode = $('#visualMode');
+const circularStyleField = $('#circularStyleField');
+const style = $('#style');
+const theme = $('#theme');
+const customColor = $('#customColor');
+const bars = $('#bars');
+const sensitivity = $('#sensitivity');
+const bassPulse = $('#bassPulse');
+const bassBoost = $('#bassBoost');
+const pulseStrength = $('#pulseStrength');
+const bassMeter = $('#bassMeter');
+const smooth = $('#smooth');
+const glow = $('#glow');
+const previewQuality = $('#previewQuality');
+const titleText = $('#titleText');
+const subtitleText = $('#subtitleText');
+const centerSize = $('#centerSize');
+const rotation = $('#rotation');
+const videoLayout = $('#videoLayout');
+const resolution = $('#resolution');
+const fps = $('#fps');
+const videoFormat = $('#videoFormat');
+const bitrate = $('#bitrate');
+const gifResolution = $('#gifResolution');
+const gifFps = $('#gifFps');
+const exportVideoBtn = $('#exportVideo');
+const exportGifBtn = $('#exportGif');
+const savePngBtn = $('#savePng');
+const cancelBtn = $('#cancel');
+const progress = $('#progress');
+const progressFill = $('#progressFill');
+const progressText = $('#progressText');
+
+let audioContext = null;
+let sourceNode = null;
+let analyser = null;
+let frequencyData = new Uint8Array(512);
+let waveformData = new Uint8Array(2048);
+let objectUrl = '';
+let rafId = 0;
+let lastRender = 0;
+let visualTime = 0;
+let exporting = false;
+let cancelRequested = false;
+let recorder = null;
+let videoWorker = null;
+let videoWorkerAbort = null;
+let exportKind = '';
+let loadedAudioFile = null;
+let gifInstance = null;
+let gifWorkerUrl = '';
+let renderWidth = 960;
+let renderHeight = 540;
+let currentRenderFps = 45;
+let trigCache = [];
+let cachedBarCount = 0;
+let smoothedBins = new Float32Array(192);
+let smoothedEnergy = { bass: 0, mid: 0, high: 0, overall: 0, beat: 0 };
+let bassBaseline = 0;
+let bassPeak = 0;
+let previousBassRaw = 0;
+let bassHistory = new Float32Array(48);
+let bassHistoryIndex = 0;
+let bassHistoryCount = 0;
+let lastBassOnsetAt = -1000;
+let activeRenderTime = 0;
+const gradientCaches = new WeakMap();
+
+const palettes = {
+  neon: ['#67f4ff', '#8065ff', '#ff4ed7'],
+  aurora: ['#56f6ad', '#4adfff', '#b56eff'],
+  sunset: ['#ffd166', '#ff6b72', '#a65cff'],
+  ice: ['#e7fdff', '#6bd5ff', '#4674ff'],
+  mono: ['#ffffff', '#aeb8d0', '#5c667e']
+};
+
+const layoutPresets = {
+  desktop: {
+    ratio: 16 / 9,
+    video: [['1280x720', '720p'], ['1920x1080', '1080p · recommended'], ['2560x1440', '1440p'], ['3840x2160', '4K']],
+    gif: [['640x360', '360p'], ['960x540', '540p'], ['1280x720', '720p']]
+  },
+  phone: {
+    ratio: 9 / 16,
+    video: [['720x1280', '720×1280'], ['1080x1920', '1080×1920 · recommended'], ['1440x2560', '1440×2560'], ['2160x3840', '4K vertical']],
+    gif: [['360x640', '360×640'], ['540x960', '540×960'], ['720x1280', '720×1280']]
+  }
+};
+
+function fillSelect(select, options, preferredIndex = 1) {
+  select.replaceChildren(...options.map(([value, label], index) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    option.selected = index === preferredIndex;
+    return option;
+  }));
+}
+
+function applyLayout() {
+  const preset = layoutPresets[videoLayout.value] || layoutPresets.desktop;
+  fillSelect(resolution, preset.video, 1);
+  fillSelect(gifResolution, preset.gif, 1);
+  wrap.classList.toggle('phone', videoLayout.value === 'phone');
+  wrap.style.aspectRatio = videoLayout.value === 'phone' ? '9 / 16' : '16 / 9';
+  choosePreviewSize();
+}
+
+function parseResolution(value) {
+  const [width, height] = value.split('x').map(Number);
+  return { width, height };
+}
+
+function formatTime(value) {
+  const s = Number.isFinite(value) ? Math.max(0, value) : 0;
+  const m = Math.floor(s / 60);
+  return `${String(m).padStart(2, '0')}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+}
+
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function rgba(hex, a) {
+  const c = hexToRgb(hex);
+  return `rgba(${c.r},${c.g},${c.b},${a})`;
+}
+
+function getPalette() {
+  if (theme.value !== 'custom') return palettes[theme.value] || palettes.neon;
+  const base = hexToRgb(customColor.value);
+  const make = (dr, dg, db) => `#${[base.r + dr, base.g + dg, base.b + db].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')}`;
+  return [customColor.value, make(-55, -12, 35), make(45, -20, -55)];
+}
+
+function choosePreviewSize() {
+  if (exporting) return;
+  const rect = wrap.getBoundingClientRect();
+  const mode = previewQuality.value;
+  let scale = mode === 'fast' ? 0.62 : mode === 'quality' ? 1 : 0.78;
+  if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4 && mode === 'auto') scale = 0.62;
+  const maxWidth = mode === 'quality' ? 1280 : 1050;
+  const ratio = (layoutPresets[videoLayout.value] || layoutPresets.desktop).ratio;
+  let width = Math.max(videoLayout.value === 'phone' ? 360 : 480, Math.min(maxWidth, Math.round(rect.width * scale)));
+  let height = Math.round(width / ratio);
+  const maxPreviewHeight = mode === 'quality' ? 1100 : 900;
+  if (height > maxPreviewHeight) {
+    height = maxPreviewHeight;
+    width = Math.round(height * ratio);
+  }
+  setRenderSize(width, height, false);
+  currentRenderFps = mode === 'fast' ? 30 : mode === 'quality' ? 60 : 45;
+  stageMeta.textContent = `${width}×${height} preview · ${currentRenderFps} FPS`;
+}
+
+function setRenderSize(width, height, resetCache = true) {
+  width = Math.max(2, Math.round(width));
+  height = Math.max(2, Math.round(height));
+  if (canvas.width === width && canvas.height === height) return;
+  canvas.width = width;
+  canvas.height = height;
+  renderWidth = width;
+  renderHeight = height;
+  if (resetCache) buildTrigCache();
+}
+
+function buildTrigCache() {
+  const count = Number(bars.value);
+  if (count === cachedBarCount && trigCache.length === count) return;
+  cachedBarCount = count;
+  trigCache = new Array(count);
+  for (let i = 0; i < count; i++) {
+    const angle = i / count * Math.PI * 2 - Math.PI / 2;
+    trigCache[i] = { angle, cos: Math.cos(angle), sin: Math.sin(angle) };
+  }
+  smoothedBins = new Float32Array(count);
+}
+
+function getBackgroundGradient(palette) {
+  const key = `${renderWidth}|${renderHeight}|${palette.join('|')}`;
+  const cached = gradientCaches.get(ctx);
+  if (cached?.key === key) return cached.gradient;
+  const gradient = ctx.createRadialGradient(renderWidth / 2, renderHeight / 2, 0, renderWidth / 2, renderHeight / 2, Math.max(renderWidth, renderHeight) * .72);
+  gradient.addColorStop(0, rgba(palette[1], .12));
+  gradient.addColorStop(.42, '#070a17');
+  gradient.addColorStop(1, '#02030a');
+  gradientCaches.set(ctx, { key, gradient });
+  return gradient;
+}
+
+function average(data, startRatio, endRatio) {
+  const start = Math.floor(data.length * startRatio);
+  const end = Math.max(start + 1, Math.floor(data.length * endRatio));
+  let total = 0;
+  for (let i = start; i < end; i++) total += data[i];
+  return total / (end - start) / 255;
+}
+
+function bandEnergyHz(data, minHz, maxHz) {
+  if (!analyser || !audioContext) return 0;
+  const hzPerBin = audioContext.sampleRate / analyser.fftSize;
+  const start = Math.max(1, Math.floor(minHz / hzPerBin));
+  const end = Math.min(data.length, Math.max(start + 1, Math.ceil(maxHz / hzPerBin)));
+  let power = 0;
+  let weightTotal = 0;
+  for (let i = start; i < end; i++) {
+    const hz = i * hzPerBin;
+    const centerWeight = 1 - Math.min(1, Math.abs(hz - 90) / 120);
+    const weight = .45 + centerWeight * .55;
+    const value = data[i] / 255;
+    power += value * value * weight;
+    weightTotal += weight;
+  }
+  return Math.sqrt(power / Math.max(.0001, weightTotal));
+}
+
+function historyStats() {
+  if (!bassHistoryCount) return { mean: 0, deviation: 0 };
+  let sum = 0;
+  for (let i = 0; i < bassHistoryCount; i++) sum += bassHistory[i];
+  const mean = sum / bassHistoryCount;
+  let variance = 0;
+  for (let i = 0; i < bassHistoryCount; i++) {
+    const d = bassHistory[i] - mean;
+    variance += d * d;
+  }
+  return { mean, deviation: Math.sqrt(variance / bassHistoryCount) };
+}
+
+function updateAudioData(time = visualTime) {
+  if (!analyser) {
+    const idle = .08 + Math.sin(time * 1.6) * .025;
+    return { bass: idle, mid: idle * .7, high: idle * .45, overall: idle, beat: idle * .5 };
+  }
+  analyser.getByteFrequencyData(frequencyData);
+  analyser.getByteTimeDomainData(waveformData);
+  const gain = Number(sensitivity.value);
+  const boost = Number(bassBoost.value);
+  const bassRaw = Math.min(1, bandEnergyHz(frequencyData, 30, 180) * gain);
+  const raw = {
+    bass: bassRaw,
+    mid: Math.min(1, bandEnergyHz(frequencyData, 180, 2200) * gain),
+    high: Math.min(1, bandEnergyHz(frequencyData, 2200, 12000) * gain),
+    overall: Math.min(1, bandEnergyHz(frequencyData, 30, 12000) * gain)
+  };
+
+  const stats = historyStats();
+  const flux = Math.max(0, bassRaw - previousBassRaw);
+  const onsetThreshold = stats.mean + Math.max(.025, stats.deviation * 1.25);
+  const nowMs = performance.now();
+  const onset = bassRaw > onsetThreshold && flux > Math.max(.008, stats.deviation * .32) && nowMs - lastBassOnsetAt > 85;
+  if (onset) lastBassOnsetAt = nowMs;
+
+  bassHistory[bassHistoryIndex] = bassRaw;
+  bassHistoryIndex = (bassHistoryIndex + 1) % bassHistory.length;
+  bassHistoryCount = Math.min(bassHistory.length, bassHistoryCount + 1);
+  previousBassRaw = bassRaw;
+
+  bassBaseline += (bassRaw - bassBaseline) * (bassRaw > bassBaseline ? .012 : .045);
+  bassPeak = Math.max(bassRaw, bassPeak * .992);
+  const range = Math.max(.08, bassPeak - bassBaseline * .55);
+  const normalizedLow = Math.max(0, Math.min(1, (bassRaw - bassBaseline * .55) / range));
+  const continuousBass = Math.min(.78, Math.pow(bassRaw, .88) * (.24 + boost * .18));
+  const beatTarget = Math.min(1, Math.max(continuousBass, normalizedLow * .72, onset ? 1 : 0));
+  const beatFactor = beatTarget > smoothedEnergy.beat ? .58 : .075;
+  smoothedEnergy.beat += (beatTarget - smoothedEnergy.beat) * beatFactor;
+
+  const factor = Math.max(.055, 1 - Number(smooth.value));
+  for (const key in raw) smoothedEnergy[key] += (raw[key] - smoothedEnergy[key]) * factor;
+  if (bassMeter) bassMeter.style.width = `${Math.round(Math.min(1, smoothedEnergy.beat) * 100)}%`;
+  return smoothedEnergy;
+}
+
+async function ensureAudioGraph() {
+  if (!audioContext) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) throw new Error('Web Audio API is not available in this browser.');
+    audioContext = new AudioCtx();
+    sourceNode = audioContext.createMediaElementSource(audio);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.minDecibels = -88;
+    analyser.maxDecibels = -12;
+    analyser.smoothingTimeConstant = Math.min(.62, Number(smooth.value) * .72);
+    sourceNode.connect(analyser);
+    analyser.connect(audioContext.destination);
+    frequencyData = new Uint8Array(analyser.frequencyBinCount);
+    waveformData = new Uint8Array(analyser.fftSize);
+  }
+  analyser.smoothingTimeConstant = Math.min(.62, Number(smooth.value) * .72);
+  if (audioContext.state === 'suspended') await audioContext.resume();
+}
+
+function getBin(i, count, energy, time = visualTime) {
+  if (!analyser) return .1 + .055 * Math.sin(i * .43 + time * 3.1) + energy.bass * .2;
+  const mirrored = i < count / 2 ? i : count - 1 - i;
+  const normalized = mirrored / Math.max(1, count / 2 - 1);
+  const index = Math.min(frequencyData.length - 1, Math.floor(Math.pow(normalized, 1.55) * frequencyData.length * .78));
+  const raw = Math.min(1, frequencyData[index] / 255 * Number(sensitivity.value));
+  const smoothingFactor = Math.max(.08, 1 - Number(smooth.value));
+  smoothedBins[i] += (raw - smoothedBins[i]) * smoothingFactor;
+  return smoothedBins[i];
+}
+
+function drawBackground(energy, palette) {
+  ctx.fillStyle = getBackgroundGradient(palette);
+  ctx.fillRect(0, 0, renderWidth, renderHeight);
+  const cx = renderWidth / 2;
+  const cy = renderHeight / 2;
+  const pulseAmount = bassPulse.checked ? energy.beat * Number(pulseStrength.value) : 0;
+  const pulse = Math.min(renderWidth, renderHeight) * (.18 + energy.bass * .025 + pulseAmount * .035);
+  ctx.beginPath();
+  ctx.arc(cx, cy, pulse * (1.6 + pulseAmount * .22), 0, Math.PI * 2);
+  ctx.fillStyle = rgba(palette[0], .025 + energy.overall * .045 + pulseAmount * .06);
+  ctx.fill();
+}
+
+function drawRing(energy, palette, time = visualTime) {
+  buildTrigCache();
+  const count = trigCache.length;
+  const minSide = Math.min(renderWidth, renderHeight);
+  const cx = renderWidth / 2;
+  const cy = renderHeight / 2;
+  const pulseAmount = bassPulse.checked ? energy.beat * Number(pulseStrength.value) : 0;
+  const baseRadius = minSide * Number(centerSize.value) * (1 + pulseAmount * .105);
+  const maxBar = minSide * (style.value === 'pulse' ? .14 : .205);
+  const lineWidth = Math.max(1.4, minSide * .0037);
+  const rot = time * Number(rotation.value) * .15;
+  const glowAmount = Number(glow.value);
+  const doubleRing = style.value === 'double';
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(rot);
+  ctx.lineCap = 'round';
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineWidth = lineWidth;
+  ctx.shadowBlur = glowAmount ? Math.min(24, minSide * .018 * glowAmount) : 0;
+
+  for (let i = 0; i < count; i++) {
+    const trig = trigCache[i];
+    const value = getBin(i, count, energy, time);
+    const shaped = Math.pow(Math.max(0, value), style.value === 'pulse' ? 1.15 : 1.5);
+    const length = minSide * .009 + shaped * maxBar * (1 + pulseAmount * .32);
+    const inner = baseRadius - (doubleRing ? length * .22 : 0);
+    const outer = baseRadius + length;
+    const color = i < count * .34 ? palette[0] : i < count * .67 ? palette[1] : palette[2];
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.beginPath();
+    ctx.moveTo(trig.cos * inner, trig.sin * inner);
+    ctx.lineTo(trig.cos * outer, trig.sin * outer);
+    ctx.stroke();
+    if (doubleRing) {
+      const inner2 = baseRadius - length * .52;
+      ctx.globalAlpha = .4;
+      ctx.beginPath();
+      ctx.moveTo(trig.cos * (inner2 - lineWidth), trig.sin * (inner2 - lineWidth));
+      ctx.lineTo(trig.cos * (inner2 - length * .22), trig.sin * (inner2 - length * .22));
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+  ctx.restore();
+}
+
+function drawCenter(energy, palette) {
+  const minSide = Math.min(renderWidth, renderHeight);
+  const cx = renderWidth / 2;
+  const cy = renderHeight / 2;
+  const pulseAmount = bassPulse.checked ? energy.beat * Number(pulseStrength.value) : 0;
+  const radius = minSide * (Number(centerSize.value) - .025) * (1 + energy.bass * .02 + pulseAmount * .09);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(3,5,13,.9)';
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, minSide * .0023);
+  ctx.strokeStyle = rgba(palette[0], .55 + energy.high * .35);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius * .86, 0, Math.PI * 2);
+  ctx.lineWidth = Math.max(1, minSide * .0014);
+  ctx.strokeStyle = rgba(palette[1], .22 + energy.mid * .25);
+  ctx.stroke();
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const titleSize = Math.max(15, minSide * .043);
+  const subtitleSize = Math.max(9, minSide * .015);
+  ctx.font = `700 ${titleSize}px Inter, system-ui, sans-serif`;
+  ctx.fillStyle = '#f8faff';
+  ctx.fillText(titleText.value.trim() || 'AUDIO REACTIVE', cx, cy - titleSize * .08);
+  ctx.font = `600 ${subtitleSize}px Inter, system-ui, sans-serif`;
+  ctx.letterSpacing = `${Math.max(1, subtitleSize * .22)}px`;
+  ctx.fillStyle = rgba(palette[0], .82);
+  ctx.fillText(subtitleText.value.trim() || 'SELECTED VISUALIZER', cx, cy + titleSize * .78);
+  ctx.restore();
+}
+
+
+function drawLinearBars(energy, palette, mirrored = false) {
+  buildTrigCache();
+  const count = trigCache.length;
+  const pulse = bassPulse.checked ? energy.beat * Number(pulseStrength.value) : 0;
+  const gap = Math.max(1, renderWidth * .0018);
+  const usable = renderWidth * .88;
+  const barWidth = Math.max(1, usable / count - gap);
+  const startX = (renderWidth - usable) / 2;
+  const baseY = mirrored ? renderHeight / 2 : renderHeight * .88;
+  const maxHeight = renderHeight * (mirrored ? .39 : .68) * (1 + pulse * .14);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.shadowBlur = Number(glow.value) * 18;
+  for (let i = 0; i < count; i++) {
+    const value = Math.pow(Math.max(.01, getBin(i, count, energy)), 1.35);
+    const height = Math.max(2, value * maxHeight);
+    const x = startX + i * (barWidth + gap);
+    const color = i < count * .34 ? palette[0] : i < count * .67 ? palette[1] : palette[2];
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    if (mirrored) {
+      ctx.fillRect(x, baseY - height, barWidth, height);
+      ctx.globalAlpha = .72;
+      ctx.fillRect(x, baseY, barWidth, height);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.fillRect(x, baseY - height, barWidth, height);
+    }
+  }
+  ctx.restore();
+}
+
+function waveformSample(index, time) {
+  if (!analyser || !waveformData.length) return Math.sin(index * .16 + time * 4) * .35;
+  const sourceIndex = Math.min(waveformData.length - 1, Math.floor(index / 320 * waveformData.length));
+  return (waveformData[sourceIndex] - 128) / 128;
+}
+
+function drawWaveformSkin(energy, palette, time = visualTime, trails = 1) {
+  const pulse = bassPulse.checked ? energy.beat * Number(pulseStrength.value) : 0;
+  const points = 320;
+  const amp = renderHeight * (.18 + pulse * .08);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  for (let trail = trails - 1; trail >= 0; trail--) {
+    ctx.beginPath();
+    const offset = (trail - (trails - 1) / 2) * renderHeight * .055;
+    for (let i = 0; i < points; i++) {
+      const x = i / (points - 1) * renderWidth;
+      const sample = waveformSample(i + trail * 7, time);
+      const y = renderHeight / 2 + offset + sample * amp * (1 - trail * .1);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    const color = palette[trail % palette.length];
+    ctx.strokeStyle = rgba(color, Math.max(.18, 1 - trail * .2));
+    ctx.lineWidth = Math.max(1.5, renderHeight * (.004 - trail * .00045));
+    ctx.shadowBlur = Number(glow.value) * 20;
+    ctx.shadowColor = color;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawRetroPlasma(energy, palette, time = visualTime) {
+  const pulse = bassPulse.checked ? energy.beat * Number(pulseStrength.value) : 0;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let band = 0; band < 12; band++) {
+    const phase = time * (.35 + band * .025) + band * .62;
+    const yBase = renderHeight * (band + .5) / 12;
+    ctx.beginPath();
+    for (let x = -20; x <= renderWidth + 20; x += Math.max(10, renderWidth / 90)) {
+      const y = yBase
+        + Math.sin(x * .012 + phase * 3.1) * renderHeight * (.035 + energy.mid * .035)
+        + Math.cos(x * .005 - phase * 2.2) * renderHeight * (.025 + pulse * .04);
+      if (x < 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    const color = palette[band % palette.length];
+    ctx.strokeStyle = rgba(color, .24 + energy.overall * .28);
+    ctx.lineWidth = Math.max(2, renderHeight * .008);
+    ctx.shadowBlur = Number(glow.value) * 16;
+    ctx.shadowColor = color;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawRetroTunnel(energy, palette, time = visualTime) {
+  const pulse = bassPulse.checked ? energy.beat * Number(pulseStrength.value) : 0;
+  const cx = renderWidth / 2 + Math.sin(time * .7) * renderWidth * .09;
+  const cy = renderHeight / 2 + Math.cos(time * .55) * renderHeight * .08;
+  const maxR = Math.hypot(renderWidth, renderHeight) * .62;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 18; i++) {
+    const z = ((i / 18 + time * .16) % 1);
+    const r = 14 + z * maxR * (1 + pulse * .08);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r, r * (.52 + energy.mid * .1), time * .22 + i * .08, 0, Math.PI * 2);
+    const color = palette[i % palette.length];
+    ctx.strokeStyle = rgba(color, .18 + (1 - z) * .55);
+    ctx.lineWidth = Math.max(1, renderHeight * (.002 + (1 - z) * .004));
+    ctx.shadowBlur = Number(glow.value) * 14;
+    ctx.shadowColor = color;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawTextOverlay(palette, subtitleFallback = 'AUDIO VISUALIZER') {
+  const title = titleText.value.trim();
+  const subtitle = subtitleText.value.trim();
+  if (!title && !subtitle) return;
+  const minSide = Math.min(renderWidth, renderHeight);
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `700 ${Math.max(18, minSide * .047)}px Inter, system-ui, sans-serif`;
+  ctx.fillStyle = '#f8faff';
+  ctx.fillText(title || 'AUDIO REACTIVE', renderWidth / 2, renderHeight * .12);
+  ctx.font = `600 ${Math.max(10, minSide * .017)}px Inter, system-ui, sans-serif`;
+  ctx.fillStyle = rgba(palette[0], .86);
+  ctx.fillText(subtitle || subtitleFallback, renderWidth / 2, renderHeight * .17);
+  ctx.restore();
+}
+
+function renderScene(targetCtx, width, height, time, energy) {
+  const previous = { ctx, renderWidth, renderHeight, activeRenderTime };
+  ctx = targetCtx;
+  renderWidth = width;
+  renderHeight = height;
+  activeRenderTime = time;
+  const palette = getPalette();
+  drawBackground(energy, palette);
+  switch (visualMode.value) {
+    case 'bars':
+      drawLinearBars(energy, palette, false);
+      drawTextOverlay(palette, 'SPECTRUM BARS');
+      break;
+    case 'mirror':
+      drawLinearBars(energy, palette, true);
+      drawTextOverlay(palette, 'MIRRORED BARS');
+      break;
+    case 'waveform':
+      drawWaveformSkin(energy, palette, time, 1);
+      drawTextOverlay(palette, 'WAVEFORM');
+      break;
+    case 'plasma':
+      drawRetroPlasma(energy, palette, time);
+      drawTextOverlay(palette, 'RETRO PLASMA');
+      break;
+    case 'tunnel':
+      drawRetroTunnel(energy, palette, time);
+      drawTextOverlay(palette, 'RETRO TUNNEL');
+      break;
+    case 'oscilloscope':
+      drawWaveformSkin(energy, palette, time, 5);
+      drawTextOverlay(palette, 'XP OSCILLOSCOPE');
+      break;
+    default:
+      drawRing(energy, palette, time);
+      drawCenter(energy, palette);
+  }
+  ctx = previous.ctx;
+  renderWidth = previous.renderWidth;
+  renderHeight = previous.renderHeight;
+  activeRenderTime = previous.activeRenderTime;
+}
+
+function render(now) {
+  rafId = requestAnimationFrame(render);
+  if (document.hidden) return;
+  const interval = 1000 / currentRenderFps;
+  if (now - lastRender < interval) return;
+  const delta = Math.min(.05, (now - lastRender) / 1000 || 0);
+  lastRender = now;
+  visualTime += delta;
+  const energy = updateAudioData(visualTime);
+  renderScene(ctx, canvas.width, canvas.height, visualTime, energy);
+}
+
+function setButtons() {
+  const loaded = Boolean(audio.src);
+  exportVideoBtn.disabled = !loaded || exporting;
+  exportGifBtn.disabled = !loaded || exporting;
+  savePngBtn.disabled = !loaded || exporting;
+  cancelBtn.disabled = !exporting;
+  fileInput.disabled = exporting;
+}
+
+function setProgress(percent, text) {
+  progress.classList.add('active');
+  progressFill.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+  progressText.textContent = text;
+}
+
+function hideProgress(delay = 1800) {
+  setTimeout(() => { if (!exporting) progress.classList.remove('active'); }, delay);
+}
+
+function safeName() {
+  const name = fileInput.files?.[0]?.name || 'audio-visualizer';
+  return name.replace(/\.[^/.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'audio-visualizer';
+}
+
+function download(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, Math.max(0, ms)));
+}
+
+function makeExportSurface(width, height) {
+  const output = document.createElement('canvas');
+  output.width = width;
+  output.height = height;
+  const outputCtx = output.getContext('2d', { alpha: false, desynchronized: true });
+  outputCtx.imageSmoothingEnabled = true;
+  outputCtx.imageSmoothingQuality = 'high';
+
+  const maxRenderPixels = 1920 * 1080;
+  const scale = Math.min(1, Math.sqrt(maxRenderPixels / (width * height)));
+  const work = document.createElement('canvas');
+  work.width = Math.max(2, Math.round(width * scale));
+  work.height = Math.max(2, Math.round(height * scale));
+  const workCtx = work.getContext('2d', { alpha: false, desynchronized: true });
+  return { output, outputCtx, work, workCtx };
+}
+
+function paintExportFrame(surface, width, height, time, energy) {
+  renderScene(surface.workCtx, surface.work.width, surface.work.height, time, energy);
+  if (surface.work.width === width && surface.work.height === height) {
+    surface.outputCtx.drawImage(surface.work, 0, 0);
+  } else {
+    surface.outputCtx.clearRect(0, 0, width, height);
+    surface.outputCtx.drawImage(surface.work, 0, 0, width, height);
+  }
+}
+
+function paintPreviewFromExport(surface) {
+  const mainCtx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+  mainCtx.clearRect(0, 0, canvas.width, canvas.height);
+  mainCtx.drawImage(surface.output, 0, 0, canvas.width, canvas.height);
+}
+
+function chooseStableExportFps(surface, width, height, requestedFps) {
+  const testEnergy = { bass: .72, mid: .46, high: .34, overall: .5, beat: .9 };
+  const started = performance.now();
+  for (let i = 0; i < 5; i++) paintExportFrame(surface, width, height, i / Math.max(1, requestedFps), testEnergy);
+  const averageFrameMs = Math.max(.1, (performance.now() - started) / 5);
+  const renderCapacity = 1000 / (averageFrameMs * 1.75);
+  const pixelCount = width * height;
+  const cores = navigator.hardwareConcurrency || 4;
+  let deviceCap = 60;
+  if (pixelCount > 2560 * 1440) deviceCap = 30;
+  else if (pixelCount >= 1920 * 1080 && cores <= 6) deviceCap = 30;
+  else if (pixelCount >= 1920 * 1080) deviceCap = 45;
+  const safeLimit = Math.min(requestedFps, deviceCap, renderCapacity);
+  if (safeLimit >= 55 && requestedFps >= 60) return 60;
+  if (safeLimit >= 40 && requestedFps >= 45) return 45;
+  return 30;
+}
+
+function waitFor(target, event) {
+  return new Promise((resolve, reject) => {
+    const ok = () => { cleanup(); resolve(); };
+    const fail = () => { cleanup(); reject(new Error(`Event failed: ${event}`)); };
+    const cleanup = () => { target.removeEventListener(event, ok); target.removeEventListener('error', fail); };
+    target.addEventListener(event, ok, { once: true });
+    target.addEventListener('error', fail, { once: true });
+  });
+}
+
+async function seekTo(time) {
+  if (Math.abs(audio.currentTime - time) < .03) return;
+  const done = waitFor(audio, 'seeked');
+  audio.currentTime = Math.max(0, Math.min(time, audio.duration || time));
+  await done;
+}
+
+async function beginExport(width, height, exportFps, kind = 'video') {
+  if (exporting) throw new Error('An export is already running.');
+  exporting = true;
+  exportKind = kind;
+  cancelRequested = false;
+  stageMeta.textContent = kind === 'video'
+    ? `Export silent MP4 ${width}×${height} · ${exportFps} FPS`
+    : `GIF export ${width}×${height} · ${exportFps} FPS`;
+  setButtons();
+}
+
+function finishExport() {
+  exporting = false;
+  exportKind = '';
+  recorder = null;
+  gifInstance = null;
+  cancelRequested = false;
+  videoWorkerAbort = null;
+  if (videoWorker) {
+    try { videoWorker.terminate(); } catch (_) {}
+    videoWorker = null;
+  }
+  choosePreviewSize();
+  setButtons();
+}
+
+function exportWorkerMain() {
+  let cancelled = false;
+  self.onmessage = async event => {
+    if (event.data?.type === 'cancel') {
+      cancelled = true;
+      return;
+    }
+    if (event.data?.type !== 'start') return;
+    try {
+      let muxerModule = null;
+      let lastImportError = null;
+      for (const moduleUrl of ['https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/+esm', 'https://esm.sh/mp4-muxer@5.2.2']) {
+        try { muxerModule = await import(moduleUrl); break; } catch (error) { lastImportError = error; }
+      }
+      if (!muxerModule) throw new Error(`The MP4 module could not be loaded. Check your internet connection and try again. ${lastImportError?.message || ''}`);
+      const { Muxer, ArrayBufferTarget } = muxerModule;
+      const cfg = event.data.config;
+      const samples = new Float32Array(event.data.samples);
+      const sampleRate = cfg.sampleRate;
+      const totalSamples = samples.length;
+      if (!totalSamples) throw new Error('The audio analysis does not contain enough samples.');
+      if (!self.OffscreenCanvas || !self.VideoEncoder || !self.VideoFrame) {
+        throw new Error('This browser does not provide WebCodecs video encoding inside a Web Worker. Use a current Chrome or Edge version.');
+      }
+
+      const videoCandidates = [
+        { codec: 'avc1.640033', width: cfg.width, height: cfg.height, bitrate: cfg.bitrate, framerate: cfg.fps, hardwareAcceleration: 'prefer-hardware', latencyMode: 'quality', avc: { format: 'avc' } },
+        { codec: 'avc1.64002a', width: cfg.width, height: cfg.height, bitrate: cfg.bitrate, framerate: cfg.fps, hardwareAcceleration: 'prefer-hardware', latencyMode: 'quality', avc: { format: 'avc' } },
+        { codec: 'avc1.4d002a', width: cfg.width, height: cfg.height, bitrate: cfg.bitrate, framerate: cfg.fps, hardwareAcceleration: 'prefer-hardware', latencyMode: 'quality', avc: { format: 'avc' } },
+        { codec: 'avc1.42001f', width: cfg.width, height: cfg.height, bitrate: cfg.bitrate, framerate: cfg.fps, hardwareAcceleration: 'prefer-hardware', latencyMode: 'quality', avc: { format: 'avc' } }
+      ];
+      let videoConfig = null;
+      for (const candidate of videoCandidates) {
+        try {
+          const support = await VideoEncoder.isConfigSupported(candidate);
+          if (support.supported) { videoConfig = support.config; break; }
+        } catch (_) {}
+      }
+      if (!videoConfig) throw new Error('The device H.264 encoder does not support the selected resolution. Try 1080p at 30 FPS.');
+
+
+      const target = new ArrayBufferTarget();
+      const muxer = new Muxer({
+        target,
+        video: { codec: 'avc', width: cfg.width, height: cfg.height },
+        fastStart: 'in-memory',
+        firstTimestampBehavior: 'offset'
+      });
+
+      let workerError = null;
+      const videoEncoder = new VideoEncoder({
+        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+        error: error => { workerError = error; }
+      });
+      videoEncoder.configure(videoConfig);
+
+      const canvas = new OffscreenCanvas(cfg.width, cfg.height);
+      const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
+      context.imageSmoothingEnabled = true;
+      const staticBackground = new OffscreenCanvas(cfg.width, cfg.height);
+      const backgroundContext = staticBackground.getContext('2d', { alpha: false, desynchronized: true });
+      const backgroundGradient = backgroundContext.createRadialGradient(cfg.width / 2, cfg.height / 2, 0, cfg.width / 2, cfg.height / 2, Math.max(cfg.width, cfg.height) * .72);
+      backgroundGradient.addColorStop(0, alpha(cfg.palette[1], .11));
+      backgroundGradient.addColorStop(.43, '#070a17');
+      backgroundGradient.addColorStop(1, '#02030a');
+      backgroundContext.fillStyle = backgroundGradient;
+      backgroundContext.fillRect(0, 0, cfg.width, cfg.height);
+      const fftSize = 1024;
+      const real = new Float64Array(fftSize);
+      const imag = new Float64Array(fftSize);
+      const magnitudes = new Float32Array(fftSize >> 1);
+      const hann = new Float32Array(fftSize);
+      for (let i = 0; i < fftSize; i++) hann[i] = .5 - .5 * Math.cos(2 * Math.PI * i / (fftSize - 1));
+      const barState = new Float32Array(cfg.bars);
+      const trig = Array.from({ length: cfg.bars }, (_, i) => {
+        const angle = i / cfg.bars * Math.PI * 2 - Math.PI / 2;
+        return [Math.cos(angle), Math.sin(angle)];
+      });
+      let spectrumPeak = .015;
+      let bassBaseline = .01;
+      let bassPeak = .04;
+      let previousBass = 0;
+      let fluxAverage = .002;
+      let pulseEnvelope = 0;
+      let lastOnsetFrame = -100;
+
+      function clamp01(value) { return Math.max(0, Math.min(1, value)); }
+      function hexRgb(hex) {
+        const n = parseInt(hex.slice(1), 16);
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+      }
+      function alpha(hex, opacity) {
+        const [r,g,b] = hexRgb(hex);
+        return `rgba(${r},${g},${b},${opacity})`;
+      }
+      function fft() {
+        let j = 0;
+        for (let i = 1; i < fftSize; i++) {
+          let bit = fftSize >> 1;
+          while (j & bit) { j ^= bit; bit >>= 1; }
+          j ^= bit;
+          if (i < j) {
+            let t = real[i]; real[i] = real[j]; real[j] = t;
+            t = imag[i]; imag[i] = imag[j]; imag[j] = t;
+          }
+        }
+        for (let len = 2; len <= fftSize; len <<= 1) {
+          const angle = -2 * Math.PI / len;
+          const wlenR = Math.cos(angle);
+          const wlenI = Math.sin(angle);
+          for (let i = 0; i < fftSize; i += len) {
+            let wr = 1, wi = 0;
+            for (let k = 0; k < len / 2; k++) {
+              const uR = real[i + k], uI = imag[i + k];
+              const vR = real[i + k + len / 2] * wr - imag[i + k + len / 2] * wi;
+              const vI = real[i + k + len / 2] * wi + imag[i + k + len / 2] * wr;
+              real[i + k] = uR + vR;
+              imag[i + k] = uI + vI;
+              real[i + k + len / 2] = uR - vR;
+              imag[i + k + len / 2] = uI - vI;
+              const nextWr = wr * wlenR - wi * wlenI;
+              wi = wr * wlenI + wi * wlenR;
+              wr = nextWr;
+            }
+          }
+        }
+      }
+      function analyseFrame(frameIndex) {
+        const center = Math.floor(frameIndex / cfg.fps * sampleRate);
+        const start = center - (fftSize >> 1);
+        for (let i = 0; i < fftSize; i++) {
+          const sampleIndex = start + i;
+          const sample = sampleIndex >= 0 && sampleIndex < totalSamples ? (samples[sampleIndex] || 0) : 0;
+          real[i] = sample * hann[i];
+          imag[i] = 0;
+        }
+        fft();
+        let maxMag = .00001;
+        for (let i = 1; i < magnitudes.length; i++) {
+          const mag = Math.hypot(real[i], imag[i]) / (fftSize * .5);
+          magnitudes[i] = mag;
+          if (mag > maxMag) maxMag = mag;
+        }
+        spectrumPeak = Math.max(maxMag, spectrumPeak * .997);
+        const hzPerBin = sampleRate / fftSize;
+        function band(minHz, maxHz) {
+          const a = Math.max(1, Math.floor(minHz / hzPerBin));
+          const b = Math.min(magnitudes.length, Math.ceil(maxHz / hzPerBin));
+          let power = 0;
+          for (let i = a; i < b; i++) power += magnitudes[i] * magnitudes[i];
+          return Math.sqrt(power / Math.max(1, b - a));
+        }
+        const bassRaw = band(30, 180);
+        const midRaw = band(180, 2200);
+        const highRaw = band(2200, Math.min(12000, sampleRate * .48));
+        bassBaseline += (bassRaw - bassBaseline) * (bassRaw > bassBaseline ? .008 : .05);
+        bassPeak = Math.max(bassRaw, bassPeak * .996);
+        const flux = Math.max(0, bassRaw - previousBass);
+        fluxAverage += (flux - fluxAverage) * .045;
+        const onset = flux > Math.max(.0008, fluxAverage * 2.15) && bassRaw > bassBaseline * 1.08 && frameIndex - lastOnsetFrame > Math.max(2, cfg.fps * .075);
+        if (onset) lastOnsetFrame = frameIndex;
+        previousBass = bassRaw;
+        const bassNorm = clamp01((bassRaw - bassBaseline * .42) / Math.max(.008, bassPeak - bassBaseline * .42));
+        const continuous = Math.min(.78, Math.pow(bassNorm, .82) * (.24 + cfg.bassBoost * .18));
+        const targetPulse = Math.max(continuous, onset ? 1 : 0);
+        pulseEnvelope += (targetPulse - pulseEnvelope) * (targetPulse > pulseEnvelope ? .62 : .095);
+        return {
+          bass: clamp01(bassRaw / Math.max(.012, bassPeak)),
+          mid: clamp01(midRaw / Math.max(.012, spectrumPeak * .48)),
+          high: clamp01(highRaw / Math.max(.008, spectrumPeak * .35)),
+          beat: clamp01(pulseEnvelope),
+          magnitudes
+        };
+      }
+      function renderFrame(frameIndex, energy) {
+        const width = cfg.width, height = cfg.height;
+        const minSide = Math.min(width, height);
+        const cx = width / 2, cy = height / 2;
+        const time = frameIndex / cfg.fps;
+        const pulse = cfg.bassPulse ? energy.beat * cfg.pulseStrength : 0;
+        context.drawImage(staticBackground, 0, 0);
+        if (pulse > .01) {
+          const pulseGradient = context.createRadialGradient(cx, cy, 0, cx, cy, minSide * (.42 + pulse * .1));
+          pulseGradient.addColorStop(0, alpha(cfg.palette[1], pulse * .07));
+          pulseGradient.addColorStop(1, alpha(cfg.palette[1], 0));
+          context.fillStyle = pulseGradient;
+          context.fillRect(0, 0, width, height);
+        }
+
+        function spectrumValue(i, count) {
+          const n = i / Math.max(1, count - 1);
+          const bin = Math.min(magnitudes.length - 1, Math.max(1, Math.floor(Math.pow(n, 1.62) * magnitudes.length * .82)));
+          const raw = clamp01(magnitudes[bin] / Math.max(.0008, spectrumPeak) * cfg.sensitivity * 1.65);
+          const stateIndex = Math.min(barState.length - 1, Math.floor(i / Math.max(1, count - 1) * (barState.length - 1)));
+          barState[stateIndex] += (raw - barState[stateIndex]) * Math.max(.09, 1 - cfg.smooth);
+          return barState[stateIndex];
+        }
+        function drawWorkerOverlay(fallback) {
+          const titleSize = Math.max(15, minSide * .043);
+          const subtitleSize = Math.max(9, minSide * .015);
+          context.textAlign = 'center';
+          context.textBaseline = 'middle';
+          context.font = `700 ${titleSize}px sans-serif`;
+          context.fillStyle = '#f8faff';
+          context.fillText(cfg.title || 'AUDIO REACTIVE', cx, height * .12);
+          context.font = `600 ${subtitleSize}px sans-serif`;
+          context.fillStyle = alpha(cfg.palette[0], .84);
+          context.fillText(cfg.subtitle || fallback, cx, height * .17);
+        }
+        function sampleAt(point, points, offset = 0) {
+          const frameCenter = Math.floor(frameIndex / cfg.fps * sampleRate);
+          const span = Math.min(totalSamples, Math.floor(sampleRate * .045));
+          const sampleIndex = Math.max(0, Math.min(totalSamples - 1, frameCenter - (span >> 1) + Math.floor(point / Math.max(1, points - 1) * span) + offset));
+          return samples[sampleIndex] || 0;
+        }
+
+        if (cfg.visualMode === 'bars' || cfg.visualMode === 'mirror') {
+          const count = cfg.bars;
+          const gap = Math.max(1, width * .0018);
+          const usable = width * .88;
+          const barWidth = Math.max(1, usable / count - gap);
+          const startX = (width - usable) / 2;
+          const mirrored = cfg.visualMode === 'mirror';
+          const baseY = mirrored ? height / 2 : height * .88;
+          const maxHeight = height * (mirrored ? .39 : .68) * (1 + pulse * .14);
+          context.save();
+          context.globalCompositeOperation = 'lighter';
+          context.shadowBlur = cfg.glow * 18;
+          for (let i = 0; i < count; i++) {
+            const value = Math.pow(Math.max(.01, spectrumValue(i, count)), 1.35);
+            const h = Math.max(2, value * maxHeight);
+            const x = startX + i * (barWidth + gap);
+            const color = i < count * .34 ? cfg.palette[0] : i < count * .67 ? cfg.palette[1] : cfg.palette[2];
+            context.fillStyle = color;
+            context.shadowColor = color;
+            context.fillRect(x, baseY - h, barWidth, h);
+            if (mirrored) {
+              context.globalAlpha = .72;
+              context.fillRect(x, baseY, barWidth, h);
+              context.globalAlpha = 1;
+            }
+          }
+          context.restore();
+          drawWorkerOverlay(mirrored ? 'MIRRORED BARS' : 'SPECTRUM BARS');
+          return;
+        }
+
+        if (cfg.visualMode === 'waveform' || cfg.visualMode === 'oscilloscope') {
+          const trails = cfg.visualMode === 'oscilloscope' ? 5 : 1;
+          const points = 320;
+          const amp = height * (.18 + pulse * .08);
+          context.save();
+          context.globalCompositeOperation = 'lighter';
+          context.lineCap = 'round';
+          for (let trail = trails - 1; trail >= 0; trail--) {
+            context.beginPath();
+            const offsetY = (trail - (trails - 1) / 2) * height * .055;
+            for (let i = 0; i < points; i++) {
+              const x = i / (points - 1) * width;
+              const y = cy + offsetY + sampleAt(i, points, trail * 17) * amp * (1 - trail * .1);
+              if (i === 0) context.moveTo(x, y); else context.lineTo(x, y);
+            }
+            const color = cfg.palette[trail % cfg.palette.length];
+            context.strokeStyle = alpha(color, Math.max(.18, 1 - trail * .2));
+            context.lineWidth = Math.max(1.5, height * (.004 - trail * .00045));
+            context.shadowBlur = cfg.glow * 20;
+            context.shadowColor = color;
+            context.stroke();
+          }
+          context.restore();
+          drawWorkerOverlay(cfg.visualMode === 'oscilloscope' ? 'XP OSCILLOSCOPE' : 'WAVEFORM');
+          return;
+        }
+
+        if (cfg.visualMode === 'plasma') {
+          context.save();
+          context.globalCompositeOperation = 'lighter';
+          for (let bandIndex = 0; bandIndex < 12; bandIndex++) {
+            const phase = time * (.35 + bandIndex * .025) + bandIndex * .62;
+            const yBase = height * (bandIndex + .5) / 12;
+            context.beginPath();
+            for (let x = -20; x <= width + 20; x += Math.max(10, width / 90)) {
+              const y = yBase + Math.sin(x * .012 + phase * 3.1) * height * (.035 + energy.mid * .035) + Math.cos(x * .005 - phase * 2.2) * height * (.025 + pulse * .04);
+              if (x < 0) context.moveTo(x, y); else context.lineTo(x, y);
+            }
+            const color = cfg.palette[bandIndex % cfg.palette.length];
+            context.strokeStyle = alpha(color, .24 + energy.mid * .28);
+            context.lineWidth = Math.max(2, height * .008);
+            context.shadowBlur = cfg.glow * 16;
+            context.shadowColor = color;
+            context.stroke();
+          }
+          context.restore();
+          drawWorkerOverlay('RETRO PLASMA');
+          return;
+        }
+
+        if (cfg.visualMode === 'tunnel') {
+          const tx = cx + Math.sin(time * .7) * width * .09;
+          const ty = cy + Math.cos(time * .55) * height * .08;
+          const maxR = Math.hypot(width, height) * .62;
+          context.save();
+          context.globalCompositeOperation = 'lighter';
+          for (let i = 0; i < 18; i++) {
+            const z = ((i / 18 + time * .16) % 1);
+            const r = 14 + z * maxR * (1 + pulse * .08);
+            context.beginPath();
+            context.ellipse(tx, ty, r, r * (.52 + energy.mid * .1), time * .22 + i * .08, 0, Math.PI * 2);
+            const color = cfg.palette[i % cfg.palette.length];
+            context.strokeStyle = alpha(color, .18 + (1 - z) * .55);
+            context.lineWidth = Math.max(1, height * (.002 + (1 - z) * .004));
+            context.shadowBlur = cfg.glow * 14;
+            context.shadowColor = color;
+            context.stroke();
+          }
+          context.restore();
+          drawWorkerOverlay('RETRO TUNNEL');
+          return;
+        }
+
+        context.beginPath();
+        context.arc(cx, cy, minSide * (.31 + pulse * .05), 0, Math.PI * 2);
+        context.fillStyle = alpha(cfg.palette[0], .028 + pulse * .075);
+        context.fill();
+        const baseRadius = minSide * cfg.centerSize * (1 + pulse * .115);
+        const maxBar = minSide * (cfg.style === 'pulse' ? .14 : .205);
+        const lineWidth = Math.max(1.5, minSide * .0037);
+        const rot = time * cfg.rotation * .15;
+        context.save();
+        context.translate(cx, cy);
+        context.rotate(rot);
+        context.lineCap = 'round';
+        context.globalCompositeOperation = 'lighter';
+        context.lineWidth = lineWidth;
+        context.shadowBlur = cfg.glow ? Math.min(24, minSide * .018 * cfg.glow) : 0;
+        for (let i = 0; i < cfg.bars; i++) {
+          const mirrored = i < cfg.bars / 2 ? i : cfg.bars - 1 - i;
+          const n = mirrored / Math.max(1, cfg.bars / 2 - 1);
+          const bin = Math.min(magnitudes.length - 1, Math.max(1, Math.floor(Math.pow(n, 1.7) * magnitudes.length * .82)));
+          const raw = clamp01(magnitudes[bin] / Math.max(.0008, spectrumPeak) * cfg.sensitivity * 1.65);
+          barState[i] += (raw - barState[i]) * Math.max(.09, 1 - cfg.smooth);
+          const shaped = Math.pow(barState[i], cfg.style === 'pulse' ? 1.12 : 1.42);
+          const length = minSide * .009 + shaped * maxBar * (1 + pulse * .38);
+          const inner = baseRadius - (cfg.style === 'double' ? length * .22 : 0);
+          const outer = baseRadius + length;
+          const color = i < cfg.bars * .34 ? cfg.palette[0] : i < cfg.bars * .67 ? cfg.palette[1] : cfg.palette[2];
+          context.strokeStyle = color;
+          context.shadowColor = color;
+          context.beginPath();
+          context.moveTo(trig[i][0] * inner, trig[i][1] * inner);
+          context.lineTo(trig[i][0] * outer, trig[i][1] * outer);
+          context.stroke();
+        }
+        context.restore();
+        const radius = minSide * (cfg.centerSize - .025) * (1 + pulse * .105);
+        context.beginPath();
+        context.arc(cx, cy, radius, 0, Math.PI * 2);
+        context.fillStyle = 'rgba(3,5,13,.92)';
+        context.fill();
+        context.lineWidth = Math.max(1, minSide * .0023);
+        context.strokeStyle = alpha(cfg.palette[0], .58 + energy.high * .25);
+        context.stroke();
+        context.beginPath();
+        context.arc(cx, cy, radius * .86, 0, Math.PI * 2);
+        context.lineWidth = Math.max(1, minSide * .0014);
+        context.strokeStyle = alpha(cfg.palette[1], .24 + energy.mid * .22);
+        context.stroke();
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        const titleSize = Math.max(15, minSide * .043);
+        const subtitleSize = Math.max(9, minSide * .015);
+        context.font = `700 ${titleSize}px sans-serif`;
+        context.fillStyle = '#f8faff';
+        context.fillText(cfg.title || 'AUDIO REACTIVE', cx, cy - titleSize * .08);
+        context.font = `600 ${subtitleSize}px sans-serif`;
+        context.fillStyle = alpha(cfg.palette[0], .84);
+        context.fillText(cfg.subtitle || 'SELECTED VISUALIZER', cx, cy + titleSize * .78);
+      }
+
+      const totalFrames = Math.ceil(totalSamples / sampleRate * cfg.fps);
+      for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+        if (cancelled) throw new Error('__CANCELLED__');
+        if (workerError) throw workerError;
+        const energy = analyseFrame(frameIndex);
+        renderFrame(frameIndex, energy);
+        const timestamp = Math.round(frameIndex * 1_000_000 / cfg.fps);
+        const frame = new VideoFrame(canvas, { timestamp, duration: Math.round(1_000_000 / cfg.fps) });
+        videoEncoder.encode(frame, { keyFrame: frameIndex % Math.max(1, cfg.fps * 2) === 0 });
+        frame.close();
+        while (videoEncoder.encodeQueueSize > 6) {
+          if (cancelled) throw new Error('__CANCELLED__');
+          await new Promise(resolve => setTimeout(resolve, 1));
+        }
+        if (frameIndex % Math.max(1, Math.round(cfg.fps / 3)) === 0) {
+          self.postMessage({ type: 'progress', phase: 'video', value: frameIndex / totalFrames });
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+      await videoEncoder.flush();
+      if (workerError) throw workerError;
+      videoEncoder.close();
+      muxer.finalize();
+      const buffer = target.buffer;
+      self.postMessage({ type: 'done', buffer }, [buffer]);
+    } catch (error) {
+      if (String(error?.message || error) === '__CANCELLED__') self.postMessage({ type: 'cancelled' });
+      else self.postMessage({ type: 'error', message: error?.message || String(error) });
+    }
+  };
+}
+
+async function decodeAudioForWorker(file) {
+  setProgress(1, 'Decoding audio for analysis…');
+  const data = await file.arrayBuffer();
+  await sleep(0);
+  const decoderContext = new (window.AudioContext || window.webkitAudioContext)();
+  try {
+    const decoded = await decoderContext.decodeAudioData(data.slice(0));
+    const sourceRate = decoded.sampleRate;
+    const analysisRate = Math.min(24000, sourceRate);
+    const step = sourceRate / analysisRate;
+    const outputLength = Math.max(1, Math.floor(decoded.duration * analysisRate));
+    const mono = new Float32Array(outputLength);
+    const channelCount = Math.max(1, Math.min(2, decoded.numberOfChannels));
+    const channelData = Array.from({ length: channelCount }, (_, channel) => decoded.getChannelData(channel));
+    const chunkSize = 131072;
+
+    for (let offset = 0; offset < outputLength; offset += chunkSize) {
+      if (cancelRequested) throw new Error('__CANCELLED__');
+      const limit = Math.min(outputLength, offset + chunkSize);
+      for (let i = offset; i < limit; i++) {
+        const sourceIndex = Math.min(decoded.length - 1, Math.floor(i * step));
+        let sample = 0;
+        for (let channel = 0; channel < channelCount; channel++) sample += channelData[channel][sourceIndex] || 0;
+        mono[i] = sample / channelCount;
+      }
+      const percent = 2 + limit / outputLength * 6;
+      setProgress(percent, `Preparing audio analysis… ${Math.round(limit / outputLength * 100)}%`);
+      await sleep(0);
+    }
+
+    return { samples: mono.buffer, sampleRate: analysisRate, duration: decoded.duration };
+  } finally {
+    try { await decoderContext.close(); } catch (_) {}
+  }
+}
+
+async function exportVideo() {
+  try {
+    if (!loadedAudioFile) throw new Error('Load an audio file first.');
+    if (!window.Worker || !window.VideoEncoder || !window.OffscreenCanvas) {
+      throw new Error('Background MP4 export requires Chrome or Edge with WebCodecs enabled.');
+    }
+    const { width, height } = parseResolution(resolution.value);
+    const exportFps = Number(fps.value);
+    await beginExport(width, height, exportFps, 'video');
+    const decoded = await decodeAudioForWorker(loadedAudioFile);
+    if (cancelRequested) throw new Error('__CANCELLED__');
+
+    const workerBlob = new Blob([`(${exportWorkerMain.toString()})()`], { type: 'text/javascript' });
+    const workerUrl = URL.createObjectURL(workerBlob);
+    videoWorker = new Worker(workerUrl);
+    URL.revokeObjectURL(workerUrl);
+    const transfer = [decoded.samples];
+    const config = {
+      width,
+      height,
+      fps: exportFps,
+      bitrate: Number(bitrate.value),
+      sampleRate: decoded.sampleRate,
+      bars: Number(bars.value),
+      sensitivity: Number(sensitivity.value),
+      bassPulse: bassPulse.checked,
+      bassBoost: Number(bassBoost.value),
+      pulseStrength: Number(pulseStrength.value),
+      smooth: Number(smooth.value),
+      glow: Number(glow.value),
+      centerSize: Number(centerSize.value),
+      rotation: Number(rotation.value),
+      visualMode: visualMode.value,
+      style: style.value,
+      palette: getPalette(),
+      title: titleText.value.trim(),
+      subtitle: subtitleText.value.trim()
+    };
+    setProgress(9, `Rendering silent MP4 · ${width}×${height} · ${exportFps} FPS`);
+
+    const result = await new Promise((resolve, reject) => {
+      let settled = false;
+      const finishResolve = value => { if (!settled) { settled = true; videoWorkerAbort = null; resolve(value); } };
+      const finishReject = error => { if (!settled) { settled = true; videoWorkerAbort = null; reject(error); } };
+      videoWorkerAbort = () => finishReject(new Error('__CANCELLED__'));
+      videoWorker.onmessage = event => {
+        const message = event.data || {};
+        if (message.type === 'progress') {
+          const percent = 9 + message.value * 89;
+          setProgress(percent, `Rendering silent MP4… ${Math.round(message.value * 100)}% · the interface remains responsive`);
+        } else if (message.type === 'done') finishResolve(message.buffer);
+        else if (message.type === 'cancelled') finishReject(new Error('__CANCELLED__'));
+        else if (message.type === 'error') finishReject(new Error(message.message || 'The Web Worker export failed.'));
+      };
+      videoWorker.onerror = event => finishReject(new Error(event.message || 'The export Web Worker stopped unexpectedly.'));
+      videoWorker.postMessage({ type: 'start', config, samples: decoded.samples }, transfer);
+    });
+
+    if (cancelRequested) throw new Error('__CANCELLED__');
+    const blob = new Blob([result], { type: 'video/mp4' });
+    download(blob, `${safeName()}-${videoLayout.value === 'phone' ? 'phone' : 'pc'}-${visualMode.value}-silent.mp4`);
+    setProgress(100, `Silent MP4 completed · ${(blob.size / 1048576).toFixed(1)} MB · ${exportFps} FPS`);
+    hideProgress(3200);
+  } catch (error) {
+    console.error(error);
+    if (error.message === '__CANCELLED__') {
+      setProgress(0, 'Silent MP4 export cancelled.');
+      hideProgress();
+    } else {
+      setProgress(0, error.message || 'MP4 export failed.');
+      hideProgress(5200);
+    }
+  } finally {
+    finishExport();
+  }
+}
+
+async function ensureGifWorker() {
+  if (gifWorkerUrl) return gifWorkerUrl;
+  const url = 'https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js';
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(String(response.status));
+    gifWorkerUrl = URL.createObjectURL(new Blob([await response.text()], { type: 'text/javascript' }));
+    return gifWorkerUrl;
+  } catch (_) {
+    return url;
+  }
+}
+
+async function exportGif() {
+  try {
+    if (typeof window.GIF !== 'function') throw new Error('The GIF encoder did not load. Internet access is required on first use.');
+    const { width, height } = parseResolution(gifResolution.value);
+    const exportFps = Number(gifFps.value);
+    const totalFrames = Math.ceil((audio.duration || 0) * exportFps);
+    if (!totalFrames) throw new Error('The audio file is not ready.');
+    if (totalFrames > 900) throw new Error('The GIF is too long. Use video export for long tracks; GIF is limited to 900 frames.');
+    await beginExport(width, height, exportFps, 'gif');
+    await seekTo(0);
+
+    const surface = makeExportSurface(width, height);
+    gifInstance = new GIF({
+      workers: Math.max(2, Math.min(4, navigator.hardwareConcurrency || 4)),
+      quality: 3,
+      width,
+      height,
+      workerScript: await ensureGifWorker(),
+      repeat: 0,
+      dither: 'FloydSteinberg-serpentine'
+    });
+    const finished = new Promise(resolve => {
+      gifInstance.on('finished', resolve);
+      gifInstance.on('abort', () => resolve(null));
+    });
+    gifInstance.on('progress', value => setProgress(65 + value * 35, `Compressing GIF… ${Math.round(value * 100)}%`));
+
+    await audio.play();
+    const delay = 1000 / exportFps;
+    let next = performance.now();
+    let captured = 0;
+    setProgress(0, `Capturing GIF ${width}×${height}…`);
+    while (!cancelRequested && !audio.ended && captured < totalFrames) {
+      const remaining = next - performance.now();
+      if (remaining > 1) await sleep(remaining);
+      const audioTime = Math.min(audio.duration || 0, audio.currentTime || captured / exportFps);
+      const energy = updateAudioData(audioTime);
+      paintExportFrame(surface, width, height, audioTime, energy);
+      gifInstance.addFrame(surface.output, { copy: true, delay });
+      if (captured % Math.max(1, Math.round(exportFps / 10)) === 0) paintPreviewFromExport(surface);
+      captured++;
+      next += delay;
+      setProgress(captured / totalFrames * 65, `Capturing frames… ${captured}/${totalFrames}`);
+    }
+    audio.pause();
+
+    if (cancelRequested) {
+      try { gifInstance.abort(); } catch (_) {}
+      setProgress(0, 'GIF export cancelled.');
+      hideProgress();
+      return;
+    }
+    setProgress(65, 'Compressing GIF…');
+    gifInstance.render();
+    const blob = await finished;
+    if (blob) {
+      download(blob, `${safeName()}-${videoLayout.value === 'phone' ? 'phone' : 'pc'}-${visualMode.value}.gif`);
+      setProgress(100, `GIF completed · ${(blob.size / 1048576).toFixed(1)} MB`);
+      hideProgress(2400);
+    }
+  } catch (error) {
+    console.error(error);
+    setProgress(0, error.message || 'GIF export failed.');
+    hideProgress(4000);
+  } finally {
+    finishExport();
+  }
+}
+
+async function savePng() {
+  const { width, height } = parseResolution(resolution.value);
+  const surface = makeExportSurface(width, height);
+  const time = audio.currentTime || visualTime;
+  const energy = updateAudioData(time);
+  paintExportFrame(surface, width, height, time, energy);
+  surface.output.toBlob(blob => {
+    if (blob) download(blob, `${safeName()}-${videoLayout.value === 'phone' ? 'phone' : 'pc'}-${visualMode.value}.png`);
+  }, 'image/png');
+}
+
+function cancelExport() {
+  if (!exporting) return;
+  cancelRequested = true;
+  if (exportKind === 'video' && videoWorker) {
+    try { videoWorker.postMessage({ type: 'cancel' }); } catch (_) {}
+    videoWorkerAbort?.();
+    setTimeout(() => { try { videoWorker?.terminate(); } catch (_) {} }, 80);
+  }
+  if (exportKind === 'gif') {
+    audio.pause();
+    if (gifInstance) { try { gifInstance.abort(); } catch (_) {} }
+  }
+  if (recorder?.state !== 'inactive') { try { recorder.stop(); } catch (_) {} }
+  setProgress(0, 'Cancelling export…');
+}
+
+async function loadFile(file) {
+  if (!file) return;
+  if (!file.type.startsWith('audio/') && !/\.(mp3|wav|ogg)$/i.test(file.name)) {
+    setProgress(0, 'Unsupported format. Use MP3, WAV or OGG.');
+    hideProgress(2600);
+    return;
+  }
+  audio.pause();
+  loadedAudioFile = file;
+  bassHistory.fill(0);
+  bassHistoryIndex = 0;
+  bassHistoryCount = 0;
+  previousBassRaw = 0;
+  lastBassOnsetAt = -1000;
+  bassBaseline = 0;
+  bassPeak = 0;
+  smoothedEnergy = { bass: 0, mid: 0, high: 0, overall: 0, beat: 0 };
+  smoothedBins.fill(0);
+  if (bassMeter) bassMeter.style.width = '0%';
+  if (objectUrl) URL.revokeObjectURL(objectUrl);
+  objectUrl = URL.createObjectURL(file);
+  audio.src = objectUrl;
+  audio.load();
+  fileName.textContent = file.name;
+  empty.classList.add('hidden');
+  setButtons();
+  try { await ensureAudioGraph(); } catch (error) { console.warn(error); }
+}
+
+fileInput.addEventListener('change', () => loadFile(fileInput.files?.[0]));
+audio.addEventListener('loadedmetadata', () => {
+  durationLabel.textContent = formatTime(audio.duration);
+  seek.max = String(audio.duration || 0);
+  setButtons();
+});
+audio.addEventListener('timeupdate', () => {
+  if (!seek.matches(':active')) seek.value = String(audio.currentTime || 0);
+  currentTimeLabel.textContent = formatTime(audio.currentTime);
+});
+audio.addEventListener('play', () => ensureAudioGraph().catch(console.warn));
+seek.addEventListener('input', () => { audio.currentTime = Number(seek.value); });
+
+for (const type of ['dragenter','dragover']) wrap.addEventListener(type, e => { e.preventDefault(); wrap.classList.add('dragging'); });
+for (const type of ['dragleave','drop']) wrap.addEventListener(type, e => { e.preventDefault(); wrap.classList.remove('dragging'); });
+wrap.addEventListener('drop', e => loadFile(e.dataTransfer?.files?.[0]));
+
+bars.addEventListener('input', () => { $('#barsValue').textContent = bars.value; cachedBarCount = 0; buildTrigCache(); });
+sensitivity.addEventListener('input', () => $('#sensitivityValue').textContent = `${Number(sensitivity.value).toFixed(2)}×`);
+bassBoost.addEventListener('input', () => $('#bassBoostValue').textContent = `${Number(bassBoost.value).toFixed(1)}×`);
+pulseStrength.addEventListener('input', () => $('#pulseStrengthValue').textContent = `${Math.round(Number(pulseStrength.value) * 100)}%`);
+smooth.addEventListener('input', () => { $('#smoothValue').textContent = `${Math.round(Number(smooth.value) * 100)}%`; if (analyser) analyser.smoothingTimeConstant = Math.min(.62, Number(smooth.value) * .72); });
+glow.addEventListener('input', () => $('#glowValue').textContent = `${Math.round(Number(glow.value) * 100)}%`);
+centerSize.addEventListener('input', () => $('#centerSizeValue').textContent = `${Math.round(Number(centerSize.value) * 100)}%`);
+rotation.addEventListener('input', () => $('#rotationValue').textContent = Number(rotation.value).toFixed(2));
+previewQuality.addEventListener('change', choosePreviewSize);
+videoLayout.addEventListener('change', applyLayout);
+theme.addEventListener('change', () => {});
+customColor.addEventListener('input', () => {});
+
+function updateVisualizationControls() {
+  const isCircular = visualMode.value === 'circular';
+  circularStyleField.style.display = isCircular ? '' : 'none';
+  centerSize.disabled = !isCircular;
+  rotation.disabled = !isCircular && !['tunnel', 'plasma'].includes(visualMode.value);
+  const labels = {
+    circular: 'SELECTED VISUALIZER', bars: 'SPECTRUM BARS', mirror: 'MIRRORED BARS',
+    waveform: 'WAVEFORM', plasma: 'RETRO PLASMA', tunnel: 'RETRO TUNNEL', oscilloscope: 'XP OSCILLOSCOPE'
+  };
+  if (!subtitleText.dataset.userEdited) subtitleText.value = labels[visualMode.value] || 'AUDIO VISUALIZER';
+}
+visualMode.addEventListener('change', updateVisualizationControls);
+subtitleText.addEventListener('input', () => { subtitleText.dataset.userEdited = '1'; });
+
+exportVideoBtn.addEventListener('click', exportVideo);
+exportGifBtn.addEventListener('click', exportGif);
+savePngBtn.addEventListener('click', savePng);
+cancelBtn.addEventListener('click', cancelExport);
+window.addEventListener('resize', () => { clearTimeout(window.__resizeTimer); window.__resizeTimer = setTimeout(choosePreviewSize, 100); });
+window.addEventListener('beforeunload', () => { if (objectUrl) URL.revokeObjectURL(objectUrl); if (gifWorkerUrl?.startsWith('blob:')) URL.revokeObjectURL(gifWorkerUrl); cancelAnimationFrame(rafId); });
+
+applyLayout();
+updateVisualizationControls();
+buildTrigCache();
+setButtons();
+rafId = requestAnimationFrame(render);
+</script>
+</body>
+</html>
