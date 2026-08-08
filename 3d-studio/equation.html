@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -78,6 +78,8 @@
         <option value="helix">Helicoid</option>
         <option value="mobius">Mobius strip</option>
         <option value="shell">Seashell</option>
+        <option value="tree">Fractal Tree</option>
+        <option value="fern">Fractal Fern</option>
       </select>
     </div>
     <div class="desc" id="desc">Classic unit sphere</div>
@@ -97,10 +99,10 @@
       <p style="margin-top:7px">Example wave: <code>x=(u-.5)*2</code>, <code>y=sin(a*PI*u)*cos(b*PI*v)*c</code>, <code>z=(v-.5)*2</code>.</p>
     </details>
 
-    <div class="row"><label>a</label><input type="range" id="pa" min="-5" max="5" step="0.05" value="1"><span class="val" id="pa-v">1.00</span></div>
-    <div class="row"><label>b</label><input type="range" id="pb" min="-5" max="5" step="0.05" value="1"><span class="val" id="pb-v">1.00</span></div>
-    <div class="row"><label>c</label><input type="range" id="pc" min="-5" max="5" step="0.05" value="0.35"><span class="val" id="pc-v">0.35</span></div>
-    <div class="row"><label>d</label><input type="range" id="pd" min="-5" max="5" step="0.05" value="1"><span class="val" id="pd-v">1.00</span></div>
+    <div class="row"><label>a</label><input type="range" id="pa" min="-10" max="10" step="0.05" value="1"><span class="val" id="pa-v">1.00</span></div>
+    <div class="row"><label>b</label><input type="range" id="pb" min="-10" max="10" step="0.05" value="1"><span class="val" id="pb-v">1.00</span></div>
+    <div class="row"><label>c</label><input type="range" id="pc" min="-10" max="10" step="0.05" value="0.35"><span class="val" id="pc-v">0.35</span></div>
+    <div class="row"><label>d</label><input type="range" id="pd" min="-10" max="10" step="0.05" value="1"><span class="val" id="pd-v">1.00</span></div>
 
     <div class="row">
       <label>Res</label>
@@ -123,6 +125,7 @@
   </div>
 
   <script src="studio-core.js"></script>
+  <script src="studio-fractals.js"></script>
   <script src="studio-webgl.js"></script>
   <script>
     'use strict';
@@ -176,7 +179,9 @@
         z: 'pow(a,v)*(b+cos(2*PI*u))*sin(c*2*PI*v)',
         a:1.3, b:1, c:2, d:1,
         desc: 'Seashell - a = growth rate, b = tube diam, c = turns'
-      }
+      },
+      tree: { x:'fractal', y:'tree', z:'branches', a:7, b:3, c:.68, d:.5, desc:'Fractal tree - a = depth, b x 10 = branch angle, c = branch scale, d = thickness' },
+      fern: { x:'fractal', y:'barnsley', z:'fern', a:1, b:1, c:.018, d:.22, desc:'Barnsley fern - resolution = leaf count, c = leaf size, d = curl' }
     };
 
     // Restricted math-expression compiler
@@ -204,6 +209,20 @@
       } catch(e) { return 0; }
     };
 
+
+    const FRACTAL_PRESETS = new Set(['tree', 'fern']);
+    function createFractalAsset(kind) {
+      const res = +document.getElementById('res').value || 26;
+      if (kind === 'tree') return StudioFractals.createTree({ depth: Math.max(1, Math.min(10, Math.round(paramA))), angleDeg: Math.max(8, Math.min(70, paramB * 10)), lengthScale: Math.max(.45, Math.min(.86, paramC)), thickness: Math.max(.006, Math.min(.12, .012 + Math.abs(paramD) * .018)) });
+      return StudioFractals.createFern({ points: Math.round(800 + (res / 60) * 7600), leafSize: Math.max(.004, Math.min(.05, Math.abs(paramC))), curl: Math.max(-1, Math.min(1, paramD)) });
+    }
+    function buildFractalShape(kind) {
+      const asset = createFractalAsset(kind);
+      shape = { verts: asset.vertices.map(([x,y,z]) => ({ x,y,z })), edges: StudioCore.facesToEdges(asset.faces), res:null, asset };
+      previewAsset = asset;
+      document.getElementById('error').textContent = '';
+      render();
+    }
     // State
     let paramA=1, paramB=1, paramC=0.35, paramD=1;
     let shape = { verts: [], edges: [] };
@@ -250,6 +269,8 @@
 
     // Build parametric surface
     function buildShape() {
+      const presetName = document.getElementById('preset').value;
+      if (FRACTAL_PRESETS.has(presetName)) { buildFractalShape(presetName); return; }
       const exX = document.getElementById('eq-x').value.trim();
       const exY = document.getElementById('eq-y').value.trim();
       const exZ = document.getElementById('eq-z').value.trim();
@@ -348,6 +369,7 @@
 
     function createCurrentAsset() {
       if (!shape.verts.length) throw new Error('Generate a shape first.');
+      if (shape.asset) return { ...shape.asset, name: `Equation Fractal: ${document.getElementById('preset').selectedOptions[0].textContent}` };
       const res = shape.res || 26;
       const rows = res + 1;
       const cols = res + 1;
@@ -412,3 +434,7 @@
   </script>
 </body>
 </html>
+
+
+
+

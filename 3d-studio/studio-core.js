@@ -1,4 +1,4 @@
-(function (global) {
+﻿(function (global) {
   'use strict';
 
   const STORAGE_KEYS = Object.freeze({
@@ -168,24 +168,59 @@
     catch { return null; }
   }
 
+  const WINDOW_PENDING_PREFIX = 'studio3d.pendingAssets.windowName:';
+
+  function writePendingToWindowName(assets) {
+    global.name = WINDOW_PENDING_PREFIX + JSON.stringify(assets.slice(-20));
+  }
+
+  function readPendingFromWindowName() {
+    try {
+      const name = String(global.name || '');
+      if (!name.startsWith(WINDOW_PENDING_PREFIX)) return [];
+      const parsed = JSON.parse(name.slice(WINDOW_PENDING_PREFIX.length));
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function clearPendingWindowName() {
+    try {
+      if (String(global.name || '').startsWith(WINDOW_PENDING_PREFIX)) global.name = '';
+    } catch { /* Window name is optional. */ }
+  }
+
   function queueAsset(rawAsset) {
     const asset = standardiseAsset(rawAsset);
     const current = readPendingAssets();
     current.push(asset);
+    const payload = current.slice(-20);
     const storage = getStorage();
-    if (!storage) throw new Error('Browser storage is unavailable. Export the JSON and import it in World Builder instead.');
-    storage.setItem(STORAGE_KEYS.pendingAssets, JSON.stringify(current.slice(-20)));
+    if (!storage) {
+      writePendingToWindowName(payload);
+      return asset;
+    }
+    try {
+      storage.setItem(STORAGE_KEYS.pendingAssets, JSON.stringify(payload));
+      clearPendingWindowName();
+    } catch (error) {
+      try { storage.removeItem(STORAGE_KEYS.pendingAssets); } catch { /* Best effort cleanup. */ }
+      writePendingToWindowName(payload);
+    }
     return asset;
   }
 
   function readPendingAssets() {
+    const windowAssets = readPendingFromWindowName();
     try {
       const storage = getStorage();
-      if (!storage) return [];
+      if (!storage) return windowAssets;
       const parsed = JSON.parse(storage.getItem(STORAGE_KEYS.pendingAssets) || '[]');
-      return Array.isArray(parsed) ? parsed : [];
+      const storageAssets = Array.isArray(parsed) ? parsed : [];
+      return storageAssets.concat(windowAssets).slice(-20);
     } catch {
-      return [];
+      return windowAssets;
     }
   }
 
@@ -193,6 +228,7 @@
     const assets = readPendingAssets();
     try { getStorage()?.removeItem(STORAGE_KEYS.pendingAssets); }
     catch { /* Storage is optional. */ }
+    clearPendingWindowName();
     return assets;
   }
 
@@ -236,3 +272,5 @@
     loadWorldDraft
   });
 })(window);
+
+
