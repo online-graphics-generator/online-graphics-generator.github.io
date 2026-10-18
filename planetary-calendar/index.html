@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+  <title>Planetary Calendar</title>
+  <meta name="description" content="A browser-based WebGL virtual planetarium with timeline controls, astronomical events, and a mini encyclopedia.">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <a class="back-link" href="../index.html">Graphics Pages</a>
+        <div>
+          <h1>Planetary Calendar</h1>
+          <p>Earth-based sky simulation, event forecast, and field guide.</p>
+        </div>
+      </div>
+      <div class="status-row" aria-live="polite">
+        <span id="engineStatus" class="status-pill">Loading ephemeris</span>
+        <span id="renderStatus" class="status-pill alt">WebGL ready</span>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <section class="stage-panel" aria-label="Virtual planetarium">
+        <div class="stage-toolbar">
+          <div>
+            <span id="localTimeLabel" class="mono">--</span>
+            <strong id="skyHeadline">Local sky</strong>
+            <span id="viewDirectionLabel" class="view-direction">Facing north</span>
+          </div>
+          <div class="toolbar-actions">
+            <button data-view-az="0" class="icon-button" type="button" title="Face north" aria-label="Face north">N</button>
+            <button data-view-az="90" class="icon-button" type="button" title="Face east" aria-label="Face east">E</button>
+            <button data-view-az="180" class="icon-button" type="button" title="Face south" aria-label="Face south">S</button>
+            <button data-view-az="270" class="icon-button" type="button" title="Face west" aria-label="Face west">W</button>
+            <button id="centerSelected" class="icon-button" type="button" title="Center selected body" aria-label="Center selected body">C</button>
+            <button id="resetView" class="icon-button" type="button" title="Reset view" aria-label="Reset view">R</button>
+            <button id="toggleLabels" class="icon-button active" type="button" title="Toggle labels" aria-label="Toggle labels">Aa</button>
+          </div>
+        </div>
+
+        <div id="skyFrame" class="sky-frame">
+          <canvas id="skyCanvas" aria-label="WebGL sky dome"></canvas>
+          <div id="skyLabels" class="sky-labels" aria-hidden="true"></div>
+          <div class="sky-readout">
+            <div>
+              <span>Observer</span>
+              <strong id="observerReadout">--</strong>
+            </div>
+            <div>
+              <span>Visible bodies</span>
+              <strong id="visibleReadout">--</strong>
+            </div>
+            <div>
+              <span>Selected</span>
+              <strong id="selectedReadout">Sun</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="body-strip" id="bodyStrip" aria-label="Astronomical bodies"></div>
+      </section>
+
+      <aside class="side-panel">
+        <section class="panel-section">
+          <div class="section-head">
+            <h2>Observation</h2>
+            <button id="useBrowserLocation" class="small-button" type="button">Use browser location</button>
+          </div>
+          <div class="control-grid">
+            <label>
+              Latitude
+              <input id="latitude" type="number" min="-90" max="90" step="0.0001" value="51.4769">
+            </label>
+            <label>
+              Longitude
+              <input id="longitude" type="number" min="-180" max="180" step="0.0001" value="0.0005">
+            </label>
+            <label>
+              Elevation m
+              <input id="elevation" type="number" min="-500" max="9000" step="1" value="46">
+            </label>
+            <label>
+              Horizon mode
+              <select id="horizonMode">
+                <option value="visible" selected>Above horizon</option>
+                <option value="all">Include below horizon</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-head">
+            <h2>Sky Layers</h2>
+          </div>
+          <label class="check-row" for="showStars">
+            <input id="showStars" type="checkbox" checked>
+            <span>Bright stars</span>
+          </label>
+          <label class="check-row" for="showStarNames">
+            <input id="showStarNames" type="checkbox" checked>
+            <span>Bright-star names</span>
+          </label>
+          <label class="check-row" for="showConstellations">
+            <input id="showConstellations" type="checkbox" checked>
+            <span>Constellation lines</span>
+          </label>
+          <label class="check-row" for="showConstellationNames">
+            <input id="showConstellationNames" type="checkbox" checked>
+            <span>Constellation names</span>
+          </label>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-head">
+            <h2>Timeline</h2>
+            <button id="setNow" class="small-button" type="button">Now</button>
+          </div>
+          <label class="wide-label">
+            Date and time
+            <input id="dateTime" type="datetime-local">
+          </label>
+          <label class="check-row" for="liveClock">
+            <input id="liveClock" type="checkbox" checked>
+            <span>Live clock when playback is stopped</span>
+          </label>
+          <div class="time-actions">
+            <button data-step="-86400" type="button">-1 day</button>
+            <button data-step="-3600" type="button">-1 hr</button>
+            <button id="playPause" class="primary-button" type="button">Play</button>
+            <button data-step="3600" type="button">+1 hr</button>
+            <button data-step="86400" type="button">+1 day</button>
+          </div>
+          <label class="wide-label">
+            Simulation speed
+            <select id="timeSpeed">
+              <option value="1">Real seconds</option>
+              <option value="60">1 min / sec</option>
+              <option value="900" selected>15 min / sec</option>
+              <option value="3600">1 hr / sec</option>
+              <option value="21600">6 hr / sec</option>
+              <option value="86400">1 day / sec</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="panel-section trajectories-section">
+          <div class="section-head">
+            <h2>Trajectories</h2>
+            <button id="clearTrajectories" class="small-button" type="button">Clear</button>
+          </div>
+          <div class="control-grid">
+            <label>
+              Range
+              <select id="trajectoryRange">
+                <option value="1" selected>24 hours</option>
+                <option value="7">7 days</option>
+                <option value="30">30 days</option>
+                <option value="365">1 year</option>
+              </select>
+            </label>
+            <label>
+              Step
+              <select id="trajectoryStep">
+                <option value="1800">30 min</option>
+                <option value="3600" selected>1 hour</option>
+                <option value="21600">6 hours</option>
+                <option value="86400">1 day</option>
+              </select>
+            </label>
+          </div>
+          <div id="trajectoryToggles" class="trajectory-toggles" aria-label="Trajectory toggles"></div>
+        </section>
+
+        <section class="panel-section events-section">
+          <div class="section-head">
+            <h2>Event Forecast</h2>
+            <button id="refreshEvents" class="small-button" type="button">Refresh</button>
+          </div>
+          <div class="event-tools">
+            <label>
+              Search range
+              <select id="forecastRange">
+                <option value="365">1 year</option>
+                <option value="1826" selected>5 years</option>
+                <option value="7305">20 years</option>
+              </select>
+            </label>
+            <button id="exportEventsJson" class="small-button" type="button">Export JSON</button>
+            <button id="exportEventsIcs" class="small-button" type="button">Export ICS</button>
+            <label class="small-button import-button" for="importEvents">Import dates</label>
+            <input id="importEvents" type="file" accept=".json,.ics,.ical,.txt,application/json,text/calendar" hidden>
+          </div>
+          <div id="eventList" class="event-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel-section encyclopedia-section">
+          <div class="section-head">
+            <h2>Encyclopedia</h2>
+            <span id="bodyCategory" class="category-pill">Star</span>
+          </div>
+          <article id="encyclopedia" class="encyclopedia"></article>
+        </section>
+      </aside>
+    </section>
+
+    <footer class="source-note">
+      Ephemeris and event calculations use the open-source Astronomy Engine library in the browser. Stars and constellation lines use an embedded bright-star subset with J2000 RA/Dec. Visual scale is illustrative; positions use local altitude and azimuth.
+    </footer>
+  </main>
+</body>
+</html>

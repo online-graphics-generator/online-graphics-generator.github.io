@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+  <title>Div Mosaic</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="back" href="../index.html">&larr; Graphics Pages</a>
+    <h1>Div Mosaic</h1>
+  </header>
+
+  <main class="layout">
+    <aside class="panel">
+      <label class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" accept="image/*" hidden>
+        <span class="dropzone-title">Import image</span>
+        <span class="dropzone-hint">Click or drop a file here</span>
+      </label>
+
+      <div class="control">
+        <label for="cols">Columns <output id="colsOut">80</output></label>
+        <input type="range" id="cols" min="8" max="400" value="80">
+      </div>
+
+      <div class="control">
+        <label for="sharpen">Sharpen <output id="sharpenOut">0</output>%</label>
+        <input type="range" id="sharpen" min="0" max="200" value="0">
+      </div>
+
+      <div class="control">
+        <label for="gap">Gap <output id="gapOut">1</output>px</label>
+        <input type="range" id="gap" min="0" max="6" value="1">
+      </div>
+
+      <div class="control">
+        <label for="shape">Shape</label>
+        <select id="shape">
+          <option value="square">Square</option>
+          <option value="rounded">Rounded</option>
+          <option value="circle">Circle</option>
+          <option value="diamond">Diamond</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label for="mode">Color mode</label>
+        <select id="mode">
+          <option value="color">Full color</option>
+          <option value="gray">Grayscale</option>
+          <option value="posterize">Posterize</option>
+          <option value="mono">Black &amp; white</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label class="check"><input type="checkbox" id="sizeByBrightness"> Size by brightness</label>
+      </div>
+
+      <div class="control">
+        <label class="check"><input type="checkbox" id="hoverFx" checked> Hover effect</label>
+      </div>
+
+      <div class="control">
+        <label for="bg">Background</label>
+        <input type="color" id="bg" value="#0b0d12">
+      </div>
+
+      <div class="actions">
+        <button id="exportBtn" disabled>Export HTML</button>
+      </div>
+
+      <p class="stats" id="stats">No image loaded.</p>
+    </aside>
+
+    <section class="stage" id="stage">
+      <div class="mosaic" id="mosaic"></div>
+      <p class="empty" id="empty">Import an image to build it out of divs.</p>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
